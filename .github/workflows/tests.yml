@@ -1,0 +1,95 @@
+name: Tests
+
+# Runs the paclet's VerificationTest suite on every push and pull request
+# against main, plus on manual dispatch. See docs/ci-setup.md for runner
+# setup instructions.
+#
+# The job targets a self-hosted macOS runner because Wolfram Language is
+# not pre-installed on GitHub's hosted runners. See the bottom of this
+# file for a docker-based hosted alternative you can enable once a
+# Wolfram Engine for Developers entitlement is available as a secret.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Cancel in-flight runs on the same ref when a newer push arrives; keeps
+  # the runner from queueing up redundant test runs on rapid pushes.
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paclet-tests:
+    name: Paclet VerificationTest suite
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Report wolframscript version
+        run: wolframscript -version
+
+      - name: Run paclet test suite
+        id: tests
+        run: |
+          wolframscript -file WolframChallengesLLMBenchmarkPaclet/Tests/RunTests.wls \
+            --junit junit.xml
+        env:
+          # OpenRouter integration tests use the env var if set; without it,
+          # those tests still pass (they're structured to degrade gracefully)
+          # but the real-network check stays meaningful when the secret is
+          # configured in the repo settings.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Upload JUnit XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-report
+          path: junit.xml
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish test summary
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: junit.xml
+          check_name: Paclet tests
+          detailed_summary: true
+          include_passed: false
+          fail_on_failure: true
+
+# ---------------------------------------------------------------------------
+# Docker-hosted alternative (commented out until a Wolfram Engine for
+# Developers entitlement is stored as secrets.WOLFRAM_ENGINE_ENTITLEMENT).
+# Drop the "if: false" guard to enable. Works on any runner, no Mac needed.
+# ---------------------------------------------------------------------------
+#
+#  paclet-tests-docker:
+#    name: Paclet tests (Wolfram Engine in Docker)
+#    runs-on: ubuntu-latest
+#    if: false    # flip to true once the entitlement secret is populated
+#    timeout-minutes: 30
+#    container:
+#      image: wolframresearch/wolframengine:14
+#      env:
+#        WOLFRAMSCRIPT_ENTITLEMENTID: ${{ secrets.WOLFRAM_ENGINE_ENTITLEMENT }}
+#        OPENROUTER_API_KEY:          ${{ secrets.OPENROUTER_API_KEY }}
+#    steps:
+#      - uses: actions/checkout@v4
+#      - run: wolframscript -version
+#      - run: |
+#          wolframscript -file WolframChallengesLLMBenchmarkPaclet/Tests/RunTests.wls \
+#            --junit junit.xml
+#      - uses: actions/upload-artifact@v4
+#        if: always()
+#        with:
+#          name: junit-report
+#          path: junit.xml

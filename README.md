@@ -1,5 +1,7 @@
 # WolframChallengesBenchmark
 
+[![Tests](https://github.com/Jofreep/WolframChallengesBenchmark/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Jofreep/WolframChallengesBenchmark/actions/workflows/tests.yml)
+
 A production-ready harness for grading LLM-generated Wolfram Language
 solutions against the [Wolfram
 Challenges](https://challenges.wolframcloud.com/) test bank.
@@ -25,30 +27,35 @@ The harness:
 
 ## Repository layout
 
-    ChallengesBenchmark/         paclet source
+    WolframChallengesLLMBenchmarkPaclet/
         PacletInfo.wl
-        ChallengesBenchmark.wl   public entry points
-        Loader.wl                JSON/WXF input validation
-        Solutions.wl             on-disk solution storage
-        Runner.wl                sandboxed runner (3 isolation modes)
-        Results.wl               summarization + run diffs
-        Report.wl                HTML / Markdown / JSON / JUnit rendering
-        Compare.wl               cross-model comparison
-        TestBankBuilder.wl       .wlchallenge parser / emitter / builder
-        Generator.wl             LLM solution generator (retry/timeout/JSONL)
-        Utilities.wl             logging, code extraction, JSONL writer
+        Kernel/
+            WolframChallengesBenchmark.wl  public symbols + dispatchers
+            Utilities.wl             logging, code extraction, JSONL writer
+            OpenRouter.wl            OpenRouter HTTP client
+            Loader.wl                JSON/WXF input validation
+            Solutions.wl             on-disk solution storage + audit
+            Generator.wl             LLM solution generator (retry/timeout/JSONL)
+            Results.wl               summarization + run diffs
+            Runner.wl                sandboxed runner (3 isolation modes)
+            Report.wl                HTML / Markdown / JSON / JUnit rendering
+            Compare.wl               cross-model comparison
+            TestBankBuilder.wl       .wlchallenge parser / emitter / builder
+        Tests/
+            *.wlt                    harness self-tests (VerificationTest)
+            RunTests.wls             test runner (TestReport, exits non-zero)
+        Documentation/English/       Reference pages and guides
     scripts/
         RunBenchmark.wls         CLI entry point
         BuildTestBank.wls        .wlchallenge → JSON + WXF compiler
         GenerateSolutions.wls    LLM-backed solution generator
+        RunOneChallenge.wls      single-challenge runner
         MigrateFromNotebook.wls  legacy-notebook → on-disk migration
         VerifyAgainstLegacy.wls  parity check with the pre-refactor notebook
         CompareModels.wls        cross-model report generator
+        TestOpenRouter.wls       OpenRouter smoke test
     config/
         <model>.json             LLM provider/model/timeout/retry config
-    tests/
-        BenchmarkTests.wlt       harness self-tests (VerificationTest)
-        RunTests.wls             test runner (TestReport, exits non-zero)
     solutions/<model>/<name>.wl  per-model candidate solutions
     runs/<runId>/                outputs of one benchmark run
         run.json                 run header + summary
@@ -194,7 +201,7 @@ so a downstream run is fully reproducible from the sidecar + log.
 
 Programmatic form:
 
-    run = ChallengesBenchmark`GenerateSolutions[challenges, testBank,
+    run = JofreEspigulePons`WolframChallengesBenchmark`GenerateSolutions[challenges, testBank,
       <|
         "Model"           -> "claude-opus-4.6",
         "OutputDirectory" -> "solutions/claude-opus-4.6",
@@ -245,7 +252,8 @@ sidecar carrying a SHA-256 source hash for cache-friendliness.
 
 ## Programmatic use
 
-    Get["ChallengesBenchmark`"];
+    PacletDirectoryLoad["WolframChallengesLLMBenchmarkPaclet"];
+    Needs["JofreEspigulePons`WolframChallengesBenchmark`"];
 
     challenges = LoadChallenges["ChallengesTestDataV1.json"];
     testBank   = LoadTestBank["ChallengesTests.wxf"];
