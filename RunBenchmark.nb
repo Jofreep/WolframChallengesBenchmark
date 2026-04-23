@@ -1,0 +1,364 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 14.0' *)
+
+(* :Name: RunBenchmark *)
+(* :Author: ChallengesBenchmark *)
+(* :Summary: Interactive driver notebook for the refactored benchmark. *)
+
+Notebook[{
+
+Cell["Wolfram Challenges Benchmark", "Title"],
+
+Cell["Interactive driver for the ChallengesBenchmark paclet. This \
+notebook is equivalent to scripts/RunBenchmark.wls but with a live \
+dashboard and an analysis section you can re-run cell by cell.", "Text"],
+
+Cell[CellGroupData[{
+
+Cell["1. Load the paclet", "Section"],
+
+Cell["Assumes this notebook lives at the repo root. Re-run this cell \
+whenever you edit a package file.", "Text"],
+
+Cell["\
+SetDirectory[NotebookDirectory[]];
+PrependTo[$Path, NotebookDirectory[]];
+Get[FileNameJoin[{NotebookDirectory[], \"ChallengesBenchmark\", \"ChallengesBenchmark.wl\"}]];", "Input"],
+
+Cell["\
+?ChallengesBenchmark`*", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["2. Configure the run", "Section"],
+
+Cell["Edit the following association. Any option left out falls back \
+to $BenchmarkDefaults.", "Text"],
+
+Cell["\
+config = <|
+  \"ChallengesPath\"   -> FileNameJoin[{NotebookDirectory[], \"ChallengesTestDataV1.json\"}],
+  \"TestBankPath\"     -> FileNameJoin[{NotebookDirectory[], \"ChallengesTests.wxf\"}],
+  \"SolutionsDir\"     -> FileNameJoin[{NotebookDirectory[], \"solutions\", \"claude-opus-4.6\"}],
+  \"Model\"            -> \"claude-opus-4.6\",
+  \"OutputDirectory\"  -> FileNameJoin[{NotebookDirectory[], \"runs\"}],
+  \"TimeConstraint\"   -> 60,
+  \"MemoryConstraint\" -> 2*^9,
+  \"Parallel\"         -> Automatic,
+  \"IsolationMode\"    -> \"PerTestKernel\",
+  \"Filter\"           -> All
+|>;", "Input"],
+
+Cell[TextData[{
+"Quick sanity check \[LongDash] drop to a small filter like ",
+StyleBox["{\"Aliquot\", \"FizzBuzz\"}", "Input"],
+" while iterating."
+}], "Text"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["3. Load inputs", "Section"],
+
+Cell["\
+challenges = ChallengesBenchmark`LoadChallenges[config[\"ChallengesPath\"]];
+testBank   = ChallengesBenchmark`LoadTestBank[config[\"TestBankPath\"]];
+solutions  = ChallengesBenchmark`LoadSolutions[config[\"SolutionsDir\"]];
+
+<|\"challenges\" -> Length[challenges],
+  \"testBank\"   -> Total[Length /@ Values[testBank]],
+  \"solutions\"  -> Length[solutions]|>", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["4. Run the benchmark", "Section"],
+
+Cell["This call blocks until all tests finish. Progress is streamed \
+to runs/<runId>/progress.jsonl \[LongDash] the dashboard in the next \
+section tails it live.", "Text"],
+
+Cell["\
+run = ChallengesBenchmark`RunBenchmark[
+  challenges, testBank, solutions,
+  \"Model\"            -> config[\"Model\"],
+  \"OutputDirectory\"  -> config[\"OutputDirectory\"],
+  \"TimeConstraint\"   -> config[\"TimeConstraint\"],
+  \"MemoryConstraint\" -> config[\"MemoryConstraint\"],
+  \"Parallel\"         -> config[\"Parallel\"],
+  \"IsolationMode\"    -> config[\"IsolationMode\"],
+  \"Filter\"           -> config[\"Filter\"]
+];
+
+<|\"runId\" -> run[\"runId\"],
+  \"runDir\" -> run[\"runDir\"],
+  \"summary\" -> run[\"meta\", \"summary\"]|>", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["5. Live dashboard", "Section"],
+
+Cell["LiveDashboard polls runDir/progress.jsonl every second and renders a \
+three-state view: 'not-started' (file does not yet exist), 'running' \
+(progress + pass/fail counts + latest test id), 'finished' (final \
+snapshot + challenges-fully-passing). It is safe to evaluate any time.\n\n\
+Because RunBenchmark in section 4 is synchronous, the kernel is busy \
+while the run is happening. To see the dashboard update in real time, \
+run section 4 from a SECOND notebook kernel (or from wolframscript) and \
+evaluate this cell in the first one. Evaluated after section 4 finishes \
+in the same kernel, it renders the post-mortem final state.", "Text"],
+
+Cell["(* Option A: tail the run produced by section 4. *)\n\
+ChallengesBenchmark`LiveDashboard[run[\"runDir\"]]", "Input"],
+
+Cell["(* Option B: tail the most recent run on disk, independent of the \
+section-4 variable. Useful when the run is being produced by another \
+kernel or by wolframscript. *)\n\
+Module[{latest},\n  latest = Last @ SortBy[FileNames[\"run-*\", \"runs\"], FileDate[#, \"Modification\"] &];\n  ChallengesBenchmark`LiveDashboard[latest]\n]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["6. Write the report", "Section"],
+
+Cell["\
+reportPaths = ChallengesBenchmark`WriteReport[run, run[\"runDir\"]];
+SystemOpen[reportPaths[\"html\"]];
+reportPaths", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["7. Analysis \[LongDash] scoreboard", "Section"],
+
+Cell["\
+summary = run[\"meta\", \"summary\"];
+Grid[{
+  {\"Total tests\",       summary[\"total\"]},
+  {\"Passed\",            summary[\"passed\"]},
+  {\"Failed\",            summary[\"failed\"]},
+  {\"Timed out\",         summary[\"timedOut\"]},
+  {\"Memory exceeded\",   summary[\"memoryExceeded\"]},
+  {\"Evaluation error\",  summary[\"evaluationError\"]},
+  {\"Parse error\",       summary[\"parseError\"]},
+  {\"Kernel died\",       summary[\"kernelDied\"]},
+  {\"No solution\",       summary[\"noSolution\"]},
+  {Style[\"Pass rate\", Bold],
+   Style[NumberForm[100. summary[\"passRate\"], {4, 2}] <> \"%\", Bold]}
+}, Frame -> All, Alignment -> {{Left, Right}}]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["8. Analysis \[LongDash] status breakdown", "Section"],
+
+Cell["\
+statusCounts = Counts[#[\"status\"] & /@ run[\"results\"]];
+BarChart[statusCounts,
+  ChartLabels -> Placed[Keys[statusCounts], Above],
+  ChartStyle -> \"Pastel\",
+  PlotLabel -> \"Outcome distribution\",
+  ImageSize -> 600,
+  AxesLabel -> {\"status\", \"count\"}]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["9. Analysis \[LongDash] per-challenge grid", "Section"],
+
+Cell["\
+perChallenge = GroupBy[run[\"results\"], #[\"challengeName\"] &];
+rows = KeyValueMap[
+  Function[{name, rs},
+    <|\"challenge\" -> name,
+      \"tests\"     -> Length[rs],
+      \"passed\"    -> Count[rs, _?(#[\"passed\"] &)],
+      \"passRate\"  -> N[Count[rs, _?(#[\"passed\"] &)] / Length[rs]],
+      \"avgSec\"    -> N[Mean[#[\"durationSec\"] & /@ rs]],
+      \"statuses\"  -> Counts[#[\"status\"] & /@ rs]|>
+  ],
+  perChallenge
+];
+Dataset[SortBy[rows, -#[\"passRate\"] &]]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["10. Analysis \[LongDash] duration distribution", "Section"],
+
+Cell["\
+durations = #[\"durationSec\"] & /@ run[\"results\"];
+Row[{
+  Histogram[durations, 30,
+    PlotLabel -> \"Duration (seconds, all tests)\",
+    AxesLabel -> {\"sec\", \"count\"},
+    ImageSize -> 400],
+  Histogram[Select[durations, # < Quantile[durations, 0.95] &], 30,
+    PlotLabel -> \"Duration (< p95)\",
+    AxesLabel -> {\"sec\", \"count\"},
+    ImageSize -> 400]
+}]", "Input"],
+
+Cell["\
+Grid[{
+  {\"mean\",    Mean[durations]},
+  {\"median\",  Median[durations]},
+  {\"p90\",     Quantile[durations, 0.90]},
+  {\"p95\",     Quantile[durations, 0.95]},
+  {\"p99\",     Quantile[durations, 0.99]},
+  {\"max\",     Max[durations]}
+}, Frame -> All, Alignment -> {{Left, Right}}]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["11. Analysis \[LongDash] slowest / fastest", "Section"],
+
+Cell["\
+slowest = Reverse @ SortBy[run[\"results\"], #[\"durationSec\"] &];
+Dataset[
+  Map[
+    <|\"testId\" -> #[\"testId\"],
+      \"status\" -> #[\"status\"],
+      \"passed\" -> #[\"passed\"],
+      \"durationSec\" -> #[\"durationSec\"]|> &,
+    Take[slowest, UpTo[15]]
+  ]
+]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["12. Analysis \[LongDash] failing-test inspector", "Section"],
+
+Cell["Interactive drill-down into any failing test.", "Text"],
+
+Cell["\
+failing = Select[run[\"results\"], ! #[\"passed\"] &];
+If[failing === {},
+  \"No failing tests.\",
+  Manipulate[
+    Module[{r = failing[[i]]},
+      Column[{
+        Style[r[\"testId\"], Bold, 16],
+        Grid[{
+          {\"status\",       r[\"status\"]},
+          {\"error\",        r[\"error\"]},
+          {\"durationSec\",  r[\"durationSec\"]},
+          {\"messageCount\", r[\"messageCount\"]}
+        }, Alignment -> {{Left, Left}}, Frame -> All],
+        Pane[Column[{
+          Style[\"expected\", Bold],
+          Short[r[\"expected\"], 10],
+          Style[\"actual\",   Bold],
+          Short[r[\"actualOutput\"], 10]
+        }], 700]
+      }]
+    ],
+    {{i, 1, \"failing test #\"}, 1, Length[failing], 1}
+  ]
+]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["13. Analysis \[LongDash] diff against a baseline", "Section"],
+
+Cell["Set baselineDir to a previous runs/<runId> directory to compare.", "Text"],
+
+Cell["\
+baselineDir = FileNameJoin[{NotebookDirectory[], \"runs\", \"INSERT-RUN-ID-HERE\"}];
+
+If[DirectoryQ[baselineDir],
+  Module[{meta, res, base, diff},
+    meta = Import[FileNameJoin[{baselineDir, \"run.json\"}], \"RawJSON\"];
+    res  = Import[FileNameJoin[{baselineDir, \"results.wxf\"}], \"WXF\"];
+    base = <|\"runId\" -> meta[\"runId\"], \"results\" -> res|>;
+    diff = ChallengesBenchmark`DiffRuns[base, run];
+    Column[{
+      Grid[{
+        {\"baseline\",    diff[\"baseline\"]},
+        {\"new\",         diff[\"new\"]},
+        {\"regressions\", Length @ diff[\"regressions\"]},
+        {\"fixes\",       Length @ diff[\"fixes\"]},
+        {\"newTests\",    Length @ diff[\"newTests\"]},
+        {\"missing\",     Length @ diff[\"missingTests\"]}
+      }, Frame -> All, Alignment -> {{Left, Right}}],
+      If[diff[\"regressions\"] =!= {},
+        Column[{Style[\"Regressions:\", Bold],
+                Column[diff[\"regressions\"]]}],
+        Style[\"No regressions.\", Darker[Green]]
+      ]
+    }]
+  ],
+  Style[\"Edit baselineDir above to point at a previous run.\", Italic]
+]", "Input"]
+
+}, Open]],
+
+Cell[CellGroupData[{
+
+Cell["14. Analysis \[LongDash] model comparison (optional)", "Section"],
+
+Cell["Sweep every runs/<runId> in a directory and plot pass rates by model.", "Text"],
+
+Cell["\
+allRunDirs = FileNames[\"run-*\", FileNameJoin[{NotebookDirectory[], \"runs\"}]];
+allMetas = Quiet @ Map[
+  Import[FileNameJoin[{#, \"run.json\"}], \"RawJSON\"] &,
+  allRunDirs
+];
+modelRows = Select[allMetas, KeyExistsQ[#, \"summary\"] &];
+Dataset[
+  SortBy[
+    Map[
+      <|\"runId\"    -> #[\"runId\"],
+        \"model\"    -> #[\"model\"],
+        \"finishedAt\" -> Lookup[#, \"finishedAt\", \"?\"],
+        \"passed\"   -> #[\"summary\", \"passed\"],
+        \"total\"    -> #[\"summary\", \"total\"],
+        \"passRate\" -> #[\"summary\", \"passRate\"]|> &,
+      modelRows
+    ],
+    -#[\"passRate\"] &
+  ]
+]", "Input"],
+
+Cell["\
+If[Length[modelRows] > 0,
+  BarChart[
+    AssociationMap[#[\"summary\", \"passRate\"] &, modelRows] /.
+      (k_ -> v_) :> (k[\"model\"] <> \"/\" <> StringTake[k[\"runId\"], -6] -> v),
+    ChartLabels -> Placed[Automatic, Above],
+    PlotLabel -> \"Pass rate by run\",
+    ImageSize -> 700,
+    BarOrigin -> Left],
+  \"No runs found.\"
+]", "Input"]
+
+}, Open]]
+
+},
+WindowSize->{1100, 800},
+WindowMargins->{{Automatic, 0}, {Automatic, 0}},
+FrontEndVersion->"14.0 for Mac OS X ARM (64-bit)",
+StyleDefinitions->"Default.nb"
+]

@@ -1,0 +1,6 @@
+{"event":"run.start","runId":"run-ISODateTimeHyphenated-f06d2a","totalTests":2,"timestamp":"2026-04-19T20:14:49"}
+{"event":"test.submit","testId":"FizzBuzz\/1","attempt":1,"timestamp":"2026-04-19T20:14:50"}
+{"event":"test.submit","testId":"FizzBuzz\/2","attempt":1,"timestamp":"2026-04-19T20:14:51"}
+{"event":"test.complete","testId":"FizzBuzz\/1","status":"Evaluated","passed":false,"durationSec":0.000110,"doneCount":1,"totalCount":2,"timestamp":"2026-04-19T20:14:51"}
+{"event":"test.complete","testId":"FizzBuzz\/2","status":"Evaluated","passed":false,"durationSec":0.000114,"doneCount":2,"totalCount":2,"timestamp":"2026-04-19T20:14:51"}
+{"event":"run.end","runId":"run-ISODateTimeHyphenated-f06d2a","durationSec":1.759792,"summary":{"total":2,"passed":0,"failed":2,"evaluationError":0,"timedOut":0,"memoryExceeded":0,"parseError":0,"noSolution":0,"kernelDied":0,"passRate":0.0,"challengesAttempted":1,"challengesFullyPassing":0,"perChallenge":{"FizzBuzz":0},"fastest":[{"testId":"FizzBuzz\/1","durationSec":0.000110},{"testId":"FizzBuzz\/2","durationSec":0.000114}],"slowest":[{"testId":"FizzBuzz\/2","durationSec":0.000114},{"testId":"FizzBuzz\/1","durationSec":0.000110}]}}

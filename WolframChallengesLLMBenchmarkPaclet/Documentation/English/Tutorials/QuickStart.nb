@@ -1,0 +1,113 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 15.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[      4205,        104]
+NotebookOptionsPosition[      2805,         76]
+NotebookOutlinePosition[      3515,         98]
+CellTagsIndexPosition[      3472,         95]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell["Quick Start", "Title",ExpressionUUID->"b1e61fd5-1b97-4670-a887-fdd73d1b4e0d"],
+
+Cell["Load the paclet", "Section",ExpressionUUID->"3b1d8020-6e69-4923-944a-785581ee99b8"],
+
+Cell[BoxData[
+ RowBox[{"Needs", "[", "\"\<JofreEspigulePons`WolframChallengesBenchmark`\>\"",
+   "]"}]], "Input",ExpressionUUID->"040140d7-e811-40f4-b314-13be7a06cbe6"],
+
+Cell["Run a smoke benchmark", "Section",ExpressionUUID->"baaa3b76-0451-451b-8127-b34810e22162"],
+
+Cell["\<\
+Build a tiny challenge set + expected-output bank, then evaluate an \
+in-process candidate solution.  This is the shape every larger run follows.\
+\>", "Text",ExpressionUUID->"cf6c737d-82ec-4ce8-88ac-364142f9e11d"],
+
+Cell[BoxData[
+ RowBox[{"RunBenchmark", "[", 
+  RowBox[{
+   RowBox[{"<|", 
+    RowBox[{"\"\<Sum\>\"", "->", "\"\<Sum\>\""}], "|>"}], ",", 
+   RowBox[{"<|", 
+    RowBox[{"\"\<Sum\>\"", "->", 
+     RowBox[{"{", 
+      RowBox[{"<|", 
+       RowBox[{
+        RowBox[{"\"\<challengeName\>\"", "->", "\"\<Sum\>\""}], ",", 
+        RowBox[{"\"\<input\>\"", "->", 
+         RowBox[{"HoldComplete", "[", 
+          RowBox[{"f", "[", 
+           RowBox[{"1", ",", "2"}], "]"}], "]"}]}], ","}]}]}]}]}], 
+   RowBox[{
+    RowBox[{
+     RowBox[{
+      RowBox[{
+       RowBox[{"\"\<expected\>\"", "->", "3"}], ",", 
+       RowBox[{"\"\<metadata\>\"", "->", 
+        RowBox[{"<|", "|>"}]}]}], "|>"}], "}"}], "|>"}], ",", 
+   RowBox[{"<|", 
+    RowBox[{"\"\<Sum\>\"", "->", 
+     RowBox[{"<|", 
+      RowBox[{"\"\<code\>\"", "->", "\"\<f[a_,b_]:=a+b\>\""}], "|>"}]}], 
+    "|>"}], ",", 
+   RowBox[{"\"\<Model\>\"", "->", "\"\<local/smoke\>\""}], ",", 
+   RowBox[{"\"\<IsolationMode\>\"", "->", "\"\<InProcess\>\""}]}], 
+  "]"}]], "Input",ExpressionUUID->"0d600e87-d6e0-4e4a-a84d-09b078a95141"],
+
+Cell["Generate candidate solutions from a model", "Section",ExpressionUUID->"d355c98e-fa06-447a-9279-da5001250526"],
+
+Cell["Requires OPENROUTER_API_KEY in the environment.", "Text",ExpressionUUID->"1d412f94-0e47-49d6-9117-fc82c93ba2ba"],
+
+Cell[BoxData[
+ RowBox[{"GenerateSolutions", "[", 
+  RowBox[{"challenges", ",", "testBank", ",", "<|", 
+   RowBox[{"\"\<Model\>\"", "->", "\"\<anthropic/claude-opus-4\>\""}], "|>"}],
+   "]"}]], "Input",ExpressionUUID->"bfadb68a-9a1f-4659-9e88-acf5dbcc8fe1"]
+},
+TaggingRules->{
+ "Metadata" -> <|
+   "title" -> "Quick Start", "type" -> "Tutorial", "paclet" -> 
+    "JofreEspigulePons/WolframChallengesBenchmark", "uri" -> 
+    "JofreEspigulePons/WolframChallengesBenchmark/tutorial/QuickStart"|>, 
+  "title" -> "Quick Start", "windowTitle" -> "Quick Start", "type" -> 
+  "Tutorial"},
+FrontEndVersion->"15.0 for Mac OS X ARM (64-bit) (February 27, 2026)",
+StyleDefinitions->FrontEnd`FileName[{"Wolfram"}, "Reference.nb", 
+  CharacterEncoding -> "UTF-8"],
+ExpressionUUID->"8c0c7eae-a309-4cf3-91ae-f10cb312c158"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[554, 20, 83, 0, 70, "Title",ExpressionUUID->"b1e61fd5-1b97-4670-a887-fdd73d1b4e0d"],
+Cell[640, 22, 89, 0, 70, "Section",ExpressionUUID->"3b1d8020-6e69-4923-944a-785581ee99b8"],
+Cell[732, 24, 168, 2, 70, "Input",ExpressionUUID->"040140d7-e811-40f4-b314-13be7a06cbe6"],
+Cell[903, 28, 95, 0, 70, "Section",ExpressionUUID->"baaa3b76-0451-451b-8127-b34810e22162"],
+Cell[1001, 30, 224, 3, 70, "Text",ExpressionUUID->"cf6c737d-82ec-4ce8-88ac-364142f9e11d"],
+Cell[1228, 35, 1075, 29, 70, "Input",ExpressionUUID->"0d600e87-d6e0-4e4a-a84d-09b078a95141"],
+Cell[2306, 66, 115, 0, 70, "Section",ExpressionUUID->"d355c98e-fa06-447a-9279-da5001250526"],
+Cell[2424, 68, 118, 0, 70, "Text",ExpressionUUID->"1d412f94-0e47-49d6-9117-fc82c93ba2ba"],
+Cell[2545, 70, 256, 4, 70, "Input",ExpressionUUID->"bfadb68a-9a1f-4659-9e88-acf5dbcc8fe1"]
+}
+]
+*)
+
+(* End of internal cache information *)

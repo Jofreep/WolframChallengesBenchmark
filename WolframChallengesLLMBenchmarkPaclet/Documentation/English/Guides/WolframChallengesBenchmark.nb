@@ -1,0 +1,131 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 15.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[      6490,        122]
+NotebookOptionsPosition[      3468,         80]
+NotebookOutlinePosition[      4266,        103]
+CellTagsIndexPosition[      4223,        100]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell["WolframChallengesBenchmark", "GuideTitle",ExpressionUUID->"456a913f-99fb-4b57-b5be-ae1407494f89"],
+
+Cell["\<\
+A production-grade benchmark harness for evaluating LLM-generated Wolfram \
+Language solutions to Wolfram Challenges. Includes direct OpenRouter API \
+integration, a sandboxed multi-kernel test runner, deterministic \
+reproducibility controls, and rich per-run metadata.\
+\>", "GuideAbstract",ExpressionUUID->"8dece4b3-b6e1-4615-9dfd-809c42353f68"],
+
+Cell["Load the paclet", "GuideFunctionsSection",ExpressionUUID->"412a1421-3419-4154-a478-d86e0a324109"],
+
+Cell[BoxData[
+ RowBox[{"Needs", "[", "\"\<JofreEspigulePons`WolframChallengesBenchmark`\>\"",
+   "]"}]], "Input",ExpressionUUID->"dc9dcbbe-6b97-4772-8155-fe52fe572b1b"],
+
+Cell["Public Symbols", "GuideFunctionsSection",ExpressionUUID->"920e8821-d08d-4d4f-bd9c-a3ab6eaf8cbd"],
+
+Cell["BenchmarkVersion", "InlineGuideFunctionListing",ExpressionUUID->"d4eb6bbc-8c72-4063-a4cf-867d45beb7e5"],
+
+Cell["OpenRouterChatComplete", "InlineGuideFunctionListing",ExpressionUUID->"822bc06c-a8e7-4db3-9e7b-1f6d9c9d81e8"],
+
+Cell["GenerateSolutions", "InlineGuideFunctionListing",ExpressionUUID->"f5f12e26-7bfc-42a8-96b8-b75b62893408"],
+
+Cell["SaveSolution", "InlineGuideFunctionListing",ExpressionUUID->"445ab575-9756-42e4-9c93-97f3938f5a5c"],
+
+Cell["ExtractCode", "InlineGuideFunctionListing",ExpressionUUID->"2e2cdc5f-c56d-4b06-8c31-af4ec6a45550"],
+
+Cell["LoadChallenges", "InlineGuideFunctionListing",ExpressionUUID->"960a38d4-a1f2-4114-b165-e0f505f99587"],
+
+Cell["LoadTestBank", "InlineGuideFunctionListing",ExpressionUUID->"9182acc5-be77-492b-b485-41a69326217a"],
+
+Cell["RunBenchmark", "InlineGuideFunctionListing",ExpressionUUID->"ada9b8fb-5272-4808-be41-edf9e8c2aad5"],
+
+Cell["DiffRuns", "InlineGuideFunctionListing",ExpressionUUID->"cd29fc98-8723-4ef4-86a4-aff1221eb6a1"],
+
+Cell["$OpenRouterAPIKey", "InlineGuideFunctionListing",ExpressionUUID->"c8a60a26-d208-4f72-a931-16d74875866c"],
+
+Cell["$BenchmarkDefaults", "InlineGuideFunctionListing",ExpressionUUID->"58ff6ee3-fbaa-4209-88c9-e4ff489e44cb"],
+
+Cell["Scripts", "GuideTutorialsSection",ExpressionUUID->"fe43148b-839d-4620-86b5-4291efc1de91"],
+
+Cell["\<\
+Scripts/RunBenchmark.wls drives a full benchmark from the shell.\
+\>", "GuideTutorial",ExpressionUUID->"6ec465d0-e798-428d-88af-00c893294df4"],
+
+Cell["\<\
+Scripts/GenerateSolutions.wls prompts a model via OpenRouter and audits \
+responses.\
+\>", "GuideTutorial",ExpressionUUID->"a4b15590-4af2-4c18-b3b8-b2fc73e3c496"],
+
+Cell["\<\
+Scripts/BuildTestBank.wls turns a .challenges plain-text file into a WXF test \
+bank.\
+\>", "GuideTutorial",ExpressionUUID->"5d595cc0-9ab9-4f24-b621-44cce3ec5a55"],
+
+Cell["Related Guides", "GuideTutorialsSection",ExpressionUUID->"72bbd384-a279-4e2f-bfb0-c3dbda0c4cbe"],
+
+Cell["Wolfram Challenges: https://challenges.wolframcloud.com", \
+"GuideTutorial",ExpressionUUID->"90247ebd-e3fc-4972-bc85-620ba48970a0"]
+},
+TaggingRules->{
+ "ModificationHighlight" -> False, 
+  "Metadata" -> <|
+   "title" -> "WolframChallengesBenchmark", "type" -> "Guide", "paclet" -> 
+    "JofreEspigulePons/WolframChallengesBenchmark", "uri" -> 
+    "JofreEspigulePons/WolframChallengesBenchmark/guide/\
+WolframChallengesBenchmark"|>, "title" -> "WolframChallengesBenchmark", 
+  "windowTitle" -> "WolframChallengesBenchmark", "type" -> "Guide"},
+FrontEndVersion->"15.0 for Mac OS X ARM (64-bit) (February 27, 2026)",
+StyleDefinitions->FrontEnd`FileName[{"Wolfram"}, "Reference.nb", 
+  CharacterEncoding -> "UTF-8"],
+ExpressionUUID->"8c0c7eae-a309-4cf3-91ae-f10cb312c158"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[554, 20, 103, 0, 70, "GuideTitle",ExpressionUUID->"456a913f-99fb-4b57-b5be-ae1407494f89"],
+Cell[660, 22, 358, 5, 70, "GuideAbstract",ExpressionUUID->"8dece4b3-b6e1-4615-9dfd-809c42353f68"],
+Cell[1021, 29, 103, 0, 70, "GuideFunctionsSection",ExpressionUUID->"412a1421-3419-4154-a478-d86e0a324109"],
+Cell[1127, 31, 168, 2, 70, "Input",ExpressionUUID->"dc9dcbbe-6b97-4772-8155-fe52fe572b1b"],
+Cell[1298, 35, 102, 0, 70, "GuideFunctionsSection",ExpressionUUID->"920e8821-d08d-4d4f-bd9c-a3ab6eaf8cbd"],
+Cell[1403, 37, 109, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"d4eb6bbc-8c72-4063-a4cf-867d45beb7e5"],
+Cell[1515, 39, 115, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"822bc06c-a8e7-4db3-9e7b-1f6d9c9d81e8"],
+Cell[1633, 41, 110, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"f5f12e26-7bfc-42a8-96b8-b75b62893408"],
+Cell[1746, 43, 105, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"445ab575-9756-42e4-9c93-97f3938f5a5c"],
+Cell[1854, 45, 104, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"2e2cdc5f-c56d-4b06-8c31-af4ec6a45550"],
+Cell[1961, 47, 107, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"960a38d4-a1f2-4114-b165-e0f505f99587"],
+Cell[2071, 49, 105, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"9182acc5-be77-492b-b485-41a69326217a"],
+Cell[2179, 51, 105, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"ada9b8fb-5272-4808-be41-edf9e8c2aad5"],
+Cell[2287, 53, 101, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"cd29fc98-8723-4ef4-86a4-aff1221eb6a1"],
+Cell[2391, 55, 110, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"c8a60a26-d208-4f72-a931-16d74875866c"],
+Cell[2504, 57, 111, 0, 70, "InlineGuideFunctionListing",ExpressionUUID->"58ff6ee3-fbaa-4209-88c9-e4ff489e44cb"],
+Cell[2618, 59, 95, 0, 70, "GuideTutorialsSection",ExpressionUUID->"fe43148b-839d-4620-86b5-4291efc1de91"],
+Cell[2716, 61, 152, 2, 70, "GuideTutorial",ExpressionUUID->"6ec465d0-e798-428d-88af-00c893294df4"],
+Cell[2871, 65, 172, 3, 70, "GuideTutorial",ExpressionUUID->"a4b15590-4af2-4c18-b3b8-b2fc73e3c496"],
+Cell[3046, 70, 173, 3, 70, "GuideTutorial",ExpressionUUID->"5d595cc0-9ab9-4f24-b621-44cce3ec5a55"],
+Cell[3222, 75, 102, 0, 70, "GuideTutorialsSection",ExpressionUUID->"72bbd384-a279-4e2f-bfb0-c3dbda0c4cbe"],
+Cell[3327, 77, 137, 1, 70, "GuideTutorial",ExpressionUUID->"90247ebd-e3fc-4972-bc85-620ba48970a0"]
+}
+]
+*)
+
+(* End of internal cache information *)

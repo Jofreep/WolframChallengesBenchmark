@@ -1,0 +1,76 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 15.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[      2818,         67]
+NotebookOptionsPosition[      1369,         38]
+NotebookOutlinePosition[      2292,         63]
+CellTagsIndexPosition[      2249,         60]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell["$BenchmarkDefaults", "ObjectName",ExpressionUUID->"7be8d8ce-b9b1-4f70-a7f0-4ae585d38778"],
+
+Cell[BoxData["$BenchmarkDefaults"], "Usage",ExpressionUUID->"86048f07-7a7b-4b59-a52d-8ef8390d394d"],
+
+Cell["No usage string defined.", "Usage",ExpressionUUID->"5ff8bbc8-0456-477d-a89f-752ec107b9c2"],
+
+Cell["Details", "NotesSection",ExpressionUUID->"03f4cb4a-3f24-4768-bbcb-411fc2ffb2ea"],
+
+Cell["\<\
+This symbol is exported by JofreEspigulePons/WolframChallengesBenchmark.\
+\>", "Notes",ExpressionUUID->"99fccc1a-70b3-46d3-9c50-fed048a76b8b"],
+
+Cell["Examples", "PrimaryExamplesSection",ExpressionUUID->"bf018572-cfc6-4a51-a540-fbda48e33f35"],
+
+Cell[BoxData[
+ RowBox[{"Needs", "[", "\"\<JofreEspigulePons`WolframChallengesBenchmark`\>\"",
+   "]"}]], "Input",ExpressionUUID->"293bf864-cd19-4408-8119-b20873b90d84"]
+},
+TaggingRules->{
+ "ModificationHighlight" -> False, 
+  "Metadata" -> <|
+   "title" -> "$BenchmarkDefaults", "type" -> "Symbol", "paclet" -> 
+    "JofreEspigulePons/WolframChallengesBenchmark", "uri" -> 
+    "JofreEspigulePons/WolframChallengesBenchmark/ref/$BenchmarkDefaults"|>, 
+  "SearchTextTranslated" -> "", "LinkTrails" -> "", "Created" -> 
+  "Mon 20 Apr 2026 16:53:54", "summary" -> "No usage string defined.", 
+  "synonyms" -> {}, "title" -> "$BenchmarkDefaults", "windowTitle" -> 
+  "$BenchmarkDefaults", "type" -> "Symbol"},
+FrontEndVersion->"15.0 for Mac OS X ARM (64-bit) (February 27, 2026)",
+StyleDefinitions->FrontEnd`FileName[{"Wolfram"}, "Reference.nb", 
+  CharacterEncoding -> "UTF-8"],
+ExpressionUUID->"8c0c7eae-a309-4cf3-91ae-f10cb312c158"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[554, 20, 95, 0, 70, "ObjectName",ExpressionUUID->"7be8d8ce-b9b1-4f70-a7f0-4ae585d38778"],
+Cell[652, 22, 99, 0, 70, "Usage",ExpressionUUID->"86048f07-7a7b-4b59-a52d-8ef8390d394d"],
+Cell[754, 24, 96, 0, 70, "Usage",ExpressionUUID->"5ff8bbc8-0456-477d-a89f-752ec107b9c2"],
+Cell[853, 26, 86, 0, 70, "NotesSection",ExpressionUUID->"03f4cb4a-3f24-4768-bbcb-411fc2ffb2ea"],
+Cell[942, 28, 152, 2, 70, "Notes",ExpressionUUID->"99fccc1a-70b3-46d3-9c50-fed048a76b8b"],
+Cell[1097, 32, 97, 0, 70, "PrimaryExamplesSection",ExpressionUUID->"bf018572-cfc6-4a51-a540-fbda48e33f35"],
+Cell[1197, 34, 168, 2, 70, "Input",ExpressionUUID->"293bf864-cd19-4408-8119-b20873b90d84"]
+}
+]
+*)
+
+(* End of internal cache information *)

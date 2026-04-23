@@ -1,0 +1,12 @@
+{
+  "model": "gpt-5",
+  "llmEvaluator": {
+    "Service": "OpenAI",
+    "Model": "gpt-5",
+    "Temperature": 0.0,
+    "MaxTokens": 4000
+  },
+  "timeoutSec": 120,
+  "maxAttempts": 3,
+  "retryBaseDelay": 2.0
+}

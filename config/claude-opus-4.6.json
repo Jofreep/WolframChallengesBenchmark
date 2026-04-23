@@ -1,0 +1,12 @@
+{
+  "model": "claude-opus-4.6",
+  "llmEvaluator": {
+    "Service": "Anthropic",
+    "Model": "claude-opus-4-6",
+    "Temperature": 0.0,
+    "MaxTokens": 4000
+  },
+  "timeoutSec": 120,
+  "maxAttempts": 3,
+  "retryBaseDelay": 2.0
+}

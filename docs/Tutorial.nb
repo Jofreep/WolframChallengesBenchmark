@@ -1,0 +1,472 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 15.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[     20843,        463]
+NotebookOptionsPosition[     15640,        397]
+NotebookOutlinePosition[     16038,        413]
+CellTagsIndexPosition[     15995,        410]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell["WolframChallengesBenchmark \[LongDash] Tutorial", "Title",ExpressionUUID->"4bd4582b-f865-4d2f-a2f7-8eb9e030ab64"],
+
+Cell["\<\
+This tutorial walks through the end-to-end workflow for grading LLM-generated \
+Wolfram Language solutions with the ChallengesBenchmark harness: loading a \
+test bank, running a model's solutions under isolation + sandbox, inspecting \
+typed results, rendering reports (including JUnit XML for CI), authoring your \
+own tests in the .wlchallenge format, auditing a solutions directory, and \
+comparing two model runs.\
+\>", "Text",ExpressionUUID->"a675f9b2-b11d-4123-a112-136fcb2c30c1"],
+
+Cell["\<\
+The harness is a regular Wolfram paclet. Every example in this notebook runs \
+in-process against a tiny synthetic test bank so you can follow along without \
+a pre-existing solutions directory.\
+\>", "Text",ExpressionUUID->"7441f271-f6b2-41b6-80c4-cd35465a2027"],
+
+Cell["1. Setup", "Section",ExpressionUUID->"d91d660f-e9df-4e34-b243-61f2161194b5"],
+
+Cell["\<\
+Point $Path at the repo root (the folder holding the ChallengesBenchmark/ \
+directory), then Get the package. If you opened this notebook from the repo, \
+the default below works out-of-the-box.\
+\>", "Text",ExpressionUUID->"d7b03408-372b-432f-a46f-f94d3a0a8641"],
+
+Cell["\<\
+$repoRoot = If[$Notebooks, NotebookDirectory[] /. $Failed :> Directory[], \
+Directory[]];
+$repoRoot = FileNameDrop[$repoRoot, -1]; (* docs/ -> repo root *)
+PrependTo[$Path, $repoRoot];
+Get[\"ChallengesBenchmark`ChallengesBenchmark`\"];
+Names[\"ChallengesBenchmark`*\"] // Sort\
+\>", "Input",ExpressionUUID->"8498077f-2c13-4b21-906d-33a089c91cb8"],
+
+Cell["\<\
+The package exposes a loader/runner/report group of functions plus a \
+.wlchallenge authoring group. Key public entry points:\
+\>", "Text",ExpressionUUID->"7904f8e2-5d0d-4e39-8245-f7e992cecce7"],
+
+Cell[BoxData[
+ FormBox[
+  RowBox[{
+   RowBox[{
+   "LoadChallenges", " ", "\[CenterDot]", " ", "LoadTestBank", " ", "\[CenterDot]",
+     " ", "LoadSolutions"}], " ", "\[LongDash]", " ", 
+   RowBox[{"import", " ", 
+    RowBox[{
+     RowBox[{"inputs", ".", "\n", "ExtractCode"}], " ", "\[CenterDot]", " ", 
+     "SaveSolution", " ", "\[CenterDot]", " ", "AuditSolutions"}]}], " ", "\[LongDash]",
+    " ", 
+   RowBox[{
+    RowBox[{"work", " ", "with", " ", "per"}], "-", 
+    RowBox[{"model", " ", "solutions", " ", "on", " ", 
+     RowBox[{"disk", ".", "\n", "RunBenchmark"}]}]}], " ", "\[LongDash]", " ", 
+   RowBox[{
+    RowBox[{"the", " ", "runner"}], ";", " ", 
+    RowBox[{"returns", " ", 
+     RowBox[{"a", " ", "'"}], 
+     RowBox[{"run", "'"}], " ", 
+     RowBox[{
+      RowBox[{"Association", ".", "\n", "WriteReport"}], " ", "\[CenterDot]", 
+      " ", "WriteJUnitReport"}]}]}], " ", "\[LongDash]", " ", 
+   RowBox[{"render", " ", 
+    RowBox[{
+     RowBox[{
+      RowBox[{
+       RowBox[{"html", "/", "md"}], "/", "json"}], "/", 
+      RowBox[{"junit", ".", "\n", "DiffRuns"}]}], " ", "\[CenterDot]", " ", 
+     "CompareModels", " ", "\[CenterDot]", " ", "WriteCompareReport"}]}], " ",
+    "\[LongDash]", " ", 
+   RowBox[{"cross", "-", 
+    RowBox[{"run", " ", 
+     RowBox[{
+      RowBox[{"analysis", ".", "\n", "LoadWLChallenge"}], " ", "\[CenterDot]",
+       " ", "BuildTestBank", " ", "\[CenterDot]", " ", "WriteTestBankFiles", 
+      " ", "\[CenterDot]", " ", "WriteWLChallengeDir"}]}]}], " ", "\[LongDash]",
+    " ", 
+   RowBox[{"plain", "-", 
+    RowBox[{"text", " ", 
+     RowBox[{"authoring", "."}]}]}]}], Code]], "Text",ExpressionUUID->\
+"22a4df16-2f30-45c0-84f3-af4b0e9a7503"],
+
+Cell["2. A minimal benchmark run", "Section",ExpressionUUID->"d48d5bce-cc7d-45a0-aeb2-475ae2953275"],
+
+Cell["\<\
+A 'test bank' is an Association mapping challenge names to lists of test \
+entries. Each entry carries a held input (so the candidate function can be \
+undefined at author time), the expected result, and optional metadata.\
+\>", "Text",ExpressionUUID->"fe970907-214c-4642-acf6-27c1909f11a4"],
+
+Cell["\<\
+miniBank = <|
+  \"DoublePlusOne\" -> {
+    <|\"challengeName\" -> \"DoublePlusOne\", \"testIndex\" -> 1,
+      \"input\" -> HoldComplete[DoublePlusOne[3]], \"expected\" -> 7,
+      \"metadata\" -> <||>|>,
+    <|\"challengeName\" -> \"DoublePlusOne\", \"testIndex\" -> 2,
+      \"input\" -> HoldComplete[DoublePlusOne[10]], \"expected\" -> 21,
+      \"metadata\" -> <||>|>
+  },
+  \"Reverse\" -> {
+    <|\"challengeName\" -> \"Reverse\", \"testIndex\" -> 1,
+      \"input\" -> HoldComplete[MyReverse[{1, 2, 3}]], \"expected\" -> {3, 2, \
+1},
+      \"metadata\" -> <||>|>
+  }
+|>;
+Length[miniBank]\
+\>", "Input",ExpressionUUID->"c4e3dd38-3cf5-4410-8c45-478d3aa7643d"],
+
+Cell["\<\
+'Solutions' is an Association mapping challenge names to {'code' -> <string>} \
+records. The code string defines the function(s) the test inputs call.\
+\>", "Text",ExpressionUUID->"9867dfc8-ab83-470a-8be4-8081a6902b77"],
+
+Cell["\<\
+miniSolutions = <|
+  \"DoublePlusOne\" -> <|
+    \"code\" -> \"DoublePlusOne[x_] := 2 x + 1\",
+    \"metadata\" -> <||>
+  |>,
+  \"Reverse\" -> <|
+    \"code\" -> \"MyReverse[xs_] := Reverse[xs]\",
+    \"metadata\" -> <||>
+  |>
+|>;\
+\>", "Input",ExpressionUUID->"4b44cfe2-ea2d-47d8-85c3-9c62a4d46dd2"],
+
+Cell["\<\
+Run. IsolationMode -> 'InProcess' is fastest (uses the driver kernel) but \
+offers no safety against candidate Abort/Quit \[LongDash] use it only for \
+self-tests. The default 'PerTestKernel' launches a fresh subkernel per test \
+via LocalSubmit.\
+\>", "Text",ExpressionUUID->"b04843f3-f8dc-4871-a407-83f297942e6b"],
+
+Cell["\<\
+tmpOut = CreateDirectory[];
+run = RunBenchmark[
+  <||>, miniBank, miniSolutions,
+  \"Model\"           -> \"tutorial-demo\",
+  \"OutputDirectory\" -> tmpOut,
+  \"IsolationMode\"   -> \"InProcess\",
+  \"Parallel\"        -> 1,
+  \"TimeConstraint\"  -> 5
+];
+Keys[run]\
+\>", "Input",ExpressionUUID->"b9579b77-92f2-4254-af6b-a1cca6975da1"],
+
+Cell["3. Reading the run Association", "Section",ExpressionUUID->"14664557-da5f-497f-b97b-51d331f97310"],
+
+Cell["\<\
+`run[\"meta\"]` holds the header: runId, model, runtime fingerprint, options \
+used, and a summary. `run[\"results\"]` is the per-test list.\
+\>", "Text",ExpressionUUID->"2c3001b0-e38f-4319-a9c9-e90214fc5b25"],
+
+Cell["run[\"meta\", \"summary\"]", "Input",ExpressionUUID->"5a23e059-06f3-445f-a256-1b381a980b4d"],
+
+Cell["\<\
+(* Per-test result records all share the same shape *)
+First[run[\"results\"]] // Keys\
+\>", "Input",ExpressionUUID->"8d8a1f87-0b8c-4f8e-8d85-2d8096f62b27"],
+
+Cell["\<\
+(* The 'status' field classifies what happened, independent of pass/fail *)
+Tally[#[\"status\"] & /@ run[\"results\"]]\
+\>", "Input",ExpressionUUID->"d79ff81d-6450-4865-8d49-54d9c910a402"],
+
+Cell["\<\
+Status codes: 'Evaluated' (ran to completion; `passed` is meaningful), \
+'TimedOut', 'MemoryExceeded', 'EvaluationError', 'ParseError', 'NoSolution', \
+'KernelDied', 'RunnerError'. Only Evaluated results can pass.\
+\>", "Text",ExpressionUUID->"9ccc8d6d-64e8-4dad-a697-3109a147fb95"],
+
+Cell["4. Rendering reports", "Section",ExpressionUUID->"8ca38c83-59ca-4ca4-87c3-b30452b8573e"],
+
+Cell["\<\
+WriteReport drops four files into the run directory: report.html (a styled \
+dashboard), report.md (Markdown summary), report.json (machine-readable) and \
+junit.xml (for CI).\
+\>", "Text",ExpressionUUID->"23a3e702-8c4a-47d7-a03f-008a096fda89"],
+
+Cell["\<\
+paths = WriteReport[run, run[\"runDir\"]];
+Association[paths]\
+\>", "Input",ExpressionUUID->"e07c2f7f-31c9-4b17-8f11-3bb9fc94c847"],
+
+Cell["\<\
+(* Peek at the Markdown summary *)
+StringTake[Import[paths[\"markdown\"], \"Text\"], UpTo[600]]\
+\>", "Input",ExpressionUUID->"d7469e0e-f37c-4481-a4f6-8cb29aeeff32"],
+
+Cell["\<\
+(* The JUnit XML is well-formed and consumable by GitHub Actions,
+   Jenkins xUnit, GitLab's test reporter, etc. *)
+StringTake[Import[paths[\"junit\"], \"Text\"], UpTo[500]]\
+\>", "Input",ExpressionUUID->"913d3397-7233-4c75-9911-7ef36a9d0daf"],
+
+Cell["5. Authoring tests: the .wlchallenge format", "Section",ExpressionUUID->"57a4e800-7e24-4f3e-b37c-be6433a1014f"],
+
+Cell["\<\
+`ChallengesTests.wxf` + `ChallengesTestDataV1.json` are the compiled runtime \
+bank. They are built from a directory of plain-text `.wlchallenge` files, one \
+per challenge, which are diffable and easy to edit.\
+\>", "Text",ExpressionUUID->"58ce1701-7979-4870-a50b-fb571f23042e"],
+
+Cell["\<\
+wlcDir = CreateDirectory[];
+aliquotPath = FileNameJoin[{wlcDir, \"aliquot.wlchallenge\"}];
+Export[aliquotPath,
+  StringJoin[
+    \"(* :Name: AliquotSequence *)\\n\",
+    \"(* :Index: 1 *)\\n\",
+    \"(* :Instruction: Write Wolfram Language code that performs the \
+following task *)\\n\",
+    \"\\n\",
+    \"(* :Prompt: *)\\n\",
+    \"Define AliquotSequence[n] returning the aliquot sequence starting at n,\
+\\n\",
+    \"terminating once it reaches 1 or enters a cycle.\\n\",
+    \"\\n\",
+    \"(* :Tests: *)\\n\",
+    \"{AliquotSequence[20], {20, 22, 14, 10, 8, 7, 1}}\\n\",
+    \"{AliquotSequence[6],  {6}}\\n\"
+  ],
+  \"Text\"];
+FileByteCount[aliquotPath]\
+\>", "Input",ExpressionUUID->"16d3e871-7d98-4f89-8016-8d1b2ad5fb24"],
+
+Cell["\<\
+LoadWLChallenge parses one file; LoadChallengesDir loads an entire directory. \
+Inputs come back as HoldComplete[expr] so the parser never evaluates \
+candidate-facing code.\
+\>", "Text",ExpressionUUID->"95d22d7c-9a15-4561-93d5-1d4660e98927"],
+
+Cell["\<\
+entry = LoadWLChallenge[aliquotPath];
+<| \"name\" -> entry[\"name\"], \"index\" -> entry[\"index\"],
+   \"testCount\" -> Length[entry[\"tests\"]],
+   \"firstInputHead\" -> Head[entry[\"tests\"][[1, 1]]] |>\
+\>", "Input",ExpressionUUID->"1f23c33d-6894-4da3-a8fb-6741b6f60faf"],
+
+Cell["\<\
+BuildTestBank returns the pair { challengesAssoc, testBankAssoc } in the \
+shape the runtime uses. WriteTestBankFiles additionally exports the legacy \
+JSON + WXF.\
+\>", "Text",ExpressionUUID->"0d668b0e-85b4-48f0-b0c5-2b1605879e31"],
+
+Cell["\<\
+{challenges, bank} = BuildTestBank[wlcDir];
+Length /@ {challenges, bank}\
+\>", "Input",ExpressionUUID->"4354c015-92bc-43be-bc0b-11afe5cc439d"],
+
+Cell["\<\
+compileOut = CreateDirectory[];
+WriteTestBankFiles[wlcDir,
+  FileNameJoin[{compileOut, \"ChallengesTestDataV1.json\"}],
+  FileNameJoin[{compileOut, \"ChallengesTests.wxf\"}]]\
+\>", "Input",ExpressionUUID->"a6d2e787-27a4-45b3-8b16-415d194c83da"],
+
+Cell["\<\
+From the command line:
+
+  wolframscript -file scripts/BuildTestBank.wls --in .challenges --json \
+ChallengesTestDataV1.json --wxf ChallengesTests.wxf
+
+Add --reverse to seed a .wlchallenge directory from an existing compiled \
+bank. The CLI post-verifies that the file it just wrote re-parses to \
+identical counts.\
+\>", "Text",ExpressionUUID->"73286238-3a3b-401e-9cd2-3d093d9b6c55"],
+
+Cell["6. Auditing a solutions directory", "Section",ExpressionUUID->"3daf03ad-f70b-42ec-badc-906a1967c395"],
+
+Cell["\<\
+Before running, you can audit a `solutions/<model>/` directory against the \
+test bank: AuditSolutions parses each file structurally (never evaluates it) \
+and reports missing files, unexpected extras, mismatched function names, \
+parse failures, and empty code. This catches mislabeled files early.\
+\>", "Text",ExpressionUUID->"99e7895d-dda5-4c0a-8513-0be72e2d7585"],
+
+Cell["\<\
+solDir = CreateDirectory[];
+Export[FileNameJoin[{solDir, \"DoublePlusOne.wl\"}],
+  \"DoublePlusOne[x_] := 2 x + 1\", \"Text\"];
+Export[FileNameJoin[{solDir, \"Reverse.wl\"}],
+  \"MyReverse[xs_] := Reverse[xs]\", \"Text\"];
+AuditSolutions[solDir, miniBank]\
+\>", "Input",ExpressionUUID->"1661aec5-eafe-47ac-a5cf-df1d806ac41b"],
+
+Cell["\<\
+SaveSolution also runs the audit at write-time if you pass the test bank as a \
+4th argument, and refuses to write the file if the code doesn't define any of \
+the expected names.\
+\>", "Text",ExpressionUUID->"008d5701-18d8-4a5c-b42e-631ec7fdf65b"],
+
+Cell["7. Comparing model runs", "Section",ExpressionUUID->"97298a88-2142-491d-8126-24840a656415"],
+
+Cell["\<\
+CompareModels takes a list of run directories (or an Association mapping \
+display labels to directories) and produces a cross-model report: per-model \
+pass rates, a per-challenge pass matrix, and 'uniquely passed / uniquely \
+failed' per model.\
+\>", "Text",ExpressionUUID->"7d63f59f-ac5c-4c2c-8a4b-57e9d1ef5a91"],
+
+Cell["\<\
+WriteCompareReport emits compare.md and compare.html so you can publish the \
+comparison alongside the individual run reports.\
+\>", "Text",ExpressionUUID->"58f0e86b-4fb4-42e2-b524-68bef482ae54"],
+
+Cell["\<\
+(* Example (pseudocode):
+
+    cmp = CompareModels[{
+      \"runs/run-2026-04-01-abc123\",
+      \"runs/run-2026-04-02-def456\"
+    }];
+    WriteCompareReport[cmp, \"runs/compare-apr\"]
+*)\
+\>", "Input",ExpressionUUID->"96df7b1a-1666-439a-93da-b3e382573957"],
+
+Cell["8. Regression detection with DiffRuns", "Section",ExpressionUUID->"ec2739d7-9b11-46e7-8a23-bc99fdc738d1"],
+
+Cell["\<\
+DiffRuns structurally compares a new run against a baseline and returns \
+`regressions` (newly-failing tests), `fixes` (newly-passing tests) and \
+`unchanged`. The CLI exposes this via `--baseline` and exits with code 3 when \
+any regression appears, which is the hook CI systems use to block merges.\
+\>", "Text",ExpressionUUID->"a76dd309-3e18-4b9e-acd3-2ce9a0b62f2d"],
+
+Cell["9. From the command line", "Section",ExpressionUUID->"ae855c2a-2104-4253-8a6b-b96156642f3e"],
+
+Cell["The full CLI surface for a CI-friendly run:", "Text",ExpressionUUID->"ee42c963-d39a-4d6a-9f49-29d4453ae4a3"],
+
+Cell["\<\
+wolframscript -file scripts/RunBenchmark.wls \\
+  --challenges ChallengesTestDataV1.json \\
+  --testbank   ChallengesTests.wxf \\
+  --solutions  solutions/claude-opus-4.6 \\
+  --model      claude-opus-4.6 \\
+  --out        runs \\
+  --parallel   8 \\
+  --timeout    60 \\
+  --memory     2000000000 \\
+  --isolation  PerTestKernel \\
+  --sandbox    true \\
+  --verify-solutions --strict-verify \\
+  --junit      ci/junit.xml \\
+  --baseline   runs/run-2026-04-01-abc123 \\
+  --fail-under 0.65\
+\>", "Program",ExpressionUUID->"aad444ad-d1fb-4cc2-9d6b-eec0ff5fba6d"],
+
+Cell["\<\
+Exit codes: 0 = ok, 1 = bad args, 2 = pass rate under threshold, 3 = \
+regressions, 4 = unexpected error, 5 = strict-verify failed.\
+\>", "Text",ExpressionUUID->"0ef0acaa-8254-4de2-bf53-2868dc19a351"],
+
+Cell["10. Cleanup", "Section",ExpressionUUID->"639a1aee-1297-48eb-b0cb-8900894a6029"],
+
+Cell["\<\
+Quiet @ DeleteDirectory[tmpOut,      DeleteContents -> True];
+Quiet @ DeleteDirectory[wlcDir,      DeleteContents -> True];
+Quiet @ DeleteDirectory[compileOut,  DeleteContents -> True];
+Quiet @ DeleteDirectory[solDir,      DeleteContents -> True];\
+\>", "Input",ExpressionUUID->"8d7b761a-aa46-4d2d-a91c-9e39e67572e5"],
+
+Cell["Further reading", "Section",ExpressionUUID->"27593910-f8cf-47e0-ae11-dac7a58ad59e"],
+
+Cell["\<\
+\[Bullet] docs/WLCHALLENGE-FORMAT.md \[LongDash] grammar of the authoring \
+format.
+\[Bullet] AUDIT.md \[LongDash] pre-refactor architecture audit.
+\[Bullet] ALTERNATIVE_TESTS.md \[LongDash] design notes on test primitives & \
+monitoring.
+\[Bullet] tests/BenchmarkTests.wlt \[LongDash] the harness's own \
+VerificationTest suite; doubles as runnable documentation for every public \
+function.\
+\>", "Text",ExpressionUUID->"bec1537e-1812-421e-97be-784a52e5f78d"]
+},
+WindowSize->{1000, 900},
+WindowMargins->{{20, Automatic}, {Automatic, 20}},
+FrontEndVersion->"15.0 for Mac OS X ARM (64-bit) (February 27, 2026)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"eae3b8cf-6f9c-4094-9833-dd8e950543ce"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[554, 20, 119, 0, 70, "Title",ExpressionUUID->"4bd4582b-f865-4d2f-a2f7-8eb9e030ab64"],
+Cell[676, 22, 496, 7, 70, "Text",ExpressionUUID->"a675f9b2-b11d-4123-a112-136fcb2c30c1"],
+Cell[1175, 31, 273, 4, 70, "Text",ExpressionUUID->"7441f271-f6b2-41b6-80c4-cd35465a2027"],
+Cell[1451, 37, 82, 0, 70, "Section",ExpressionUUID->"d91d660f-e9df-4e34-b243-61f2161194b5"],
+Cell[1536, 39, 273, 4, 70, "Text",ExpressionUUID->"d7b03408-372b-432f-a46f-f94d3a0a8641"],
+Cell[1812, 45, 356, 7, 70, "Input",ExpressionUUID->"8498077f-2c13-4b21-906d-33a089c91cb8"],
+Cell[2171, 54, 204, 3, 70, "Text",ExpressionUUID->"7904f8e2-5d0d-4e39-8245-f7e992cecce7"],
+Cell[2378, 59, 1695, 41, 70, "Text",ExpressionUUID->"22a4df16-2f30-45c0-84f3-af4b0e9a7503"],
+Cell[4076, 102, 100, 0, 70, "Section",ExpressionUUID->"d48d5bce-cc7d-45a0-aeb2-475ae2953275"],
+Cell[4179, 104, 301, 4, 70, "Text",ExpressionUUID->"fe970907-214c-4642-acf6-27c1909f11a4"],
+Cell[4483, 110, 673, 18, 70, "Input",ExpressionUUID->"c4e3dd38-3cf5-4410-8c45-478d3aa7643d"],
+Cell[5159, 130, 229, 3, 70, "Text",ExpressionUUID->"9867dfc8-ab83-470a-8be4-8081a6902b77"],
+Cell[5391, 135, 310, 11, 70, "Input",ExpressionUUID->"4b44cfe2-ea2d-47d8-85c3-9c62a4d46dd2"],
+Cell[5704, 148, 325, 5, 70, "Text",ExpressionUUID->"b04843f3-f8dc-4871-a407-83f297942e6b"],
+Cell[6032, 155, 345, 11, 70, "Input",ExpressionUUID->"b9579b77-92f2-4254-af6b-a1cca6975da1"],
+Cell[6380, 168, 104, 0, 70, "Section",ExpressionUUID->"14664557-da5f-497f-b97b-51d331f97310"],
+Cell[6487, 170, 219, 3, 70, "Text",ExpressionUUID->"2c3001b0-e38f-4319-a9c9-e90214fc5b25"],
+Cell[6709, 175, 98, 0, 70, "Input",ExpressionUUID->"5a23e059-06f3-445f-a256-1b381a980b4d"],
+Cell[6810, 177, 166, 3, 70, "Input",ExpressionUUID->"8d8a1f87-0b8c-4f8e-8d85-2d8096f62b27"],
+Cell[6979, 182, 198, 3, 70, "Input",ExpressionUUID->"d79ff81d-6450-4865-8d49-54d9c910a402"],
+Cell[7180, 187, 292, 4, 70, "Text",ExpressionUUID->"9ccc8d6d-64e8-4dad-a697-3109a147fb95"],
+Cell[7475, 193, 94, 0, 70, "Section",ExpressionUUID->"8ca38c83-59ca-4ca4-87c3-b30452b8573e"],
+Cell[7572, 195, 254, 4, 70, "Text",ExpressionUUID->"23a3e702-8c4a-47d7-a03f-008a096fda89"],
+Cell[7829, 201, 141, 3, 70, "Input",ExpressionUUID->"e07c2f7f-31c9-4b17-8f11-3bb9fc94c847"],
+Cell[7973, 206, 175, 3, 70, "Input",ExpressionUUID->"d7469e0e-f37c-4481-a4f6-8cb29aeeff32"],
+Cell[8151, 211, 253, 4, 70, "Input",ExpressionUUID->"913d3397-7233-4c75-9911-7ef36a9d0daf"],
+Cell[8407, 217, 117, 0, 70, "Section",ExpressionUUID->"57a4e800-7e24-4f3e-b37c-be6433a1014f"],
+Cell[8527, 219, 289, 4, 70, "Text",ExpressionUUID->"58ce1701-7979-4870-a50b-fb571f23042e"],
+Cell[8819, 225, 738, 21, 70, "Input",ExpressionUUID->"16d3e871-7d98-4f89-8016-8d1b2ad5fb24"],
+Cell[9560, 248, 252, 4, 70, "Text",ExpressionUUID->"95d22d7c-9a15-4561-93d5-1d4660e98927"],
+Cell[9815, 254, 285, 5, 70, "Input",ExpressionUUID->"1f23c33d-6894-4da3-a8fb-6741b6f60faf"],
+Cell[10103, 261, 242, 4, 70, "Text",ExpressionUUID->"0d668b0e-85b4-48f0-b0c5-2b1605879e31"],
+Cell[10348, 267, 152, 3, 70, "Input",ExpressionUUID->"4354c015-92bc-43be-bc0b-11afe5cc439d"],
+Cell[10503, 272, 254, 5, 70, "Input",ExpressionUUID->"a6d2e787-27a4-45b3-8b16-415d194c83da"],
+Cell[10760, 279, 393, 9, 70, "Text",ExpressionUUID->"73286238-3a3b-401e-9cd2-3d093d9b6c55"],
+Cell[11156, 290, 107, 0, 70, "Section",ExpressionUUID->"3daf03ad-f70b-42ec-badc-906a1967c395"],
+Cell[11266, 292, 378, 5, 70, "Text",ExpressionUUID->"99e7895d-dda5-4c0a-8513-0be72e2d7585"],
+Cell[11647, 299, 335, 7, 70, "Input",ExpressionUUID->"1661aec5-eafe-47ac-a5cf-df1d806ac41b"],
+Cell[11985, 308, 258, 4, 70, "Text",ExpressionUUID->"008d5701-18d8-4a5c-b42e-631ec7fdf65b"],
+Cell[12246, 314, 97, 0, 70, "Section",ExpressionUUID->"97298a88-2142-491d-8126-24840a656415"],
+Cell[12346, 316, 325, 5, 70, "Text",ExpressionUUID->"7d63f59f-ac5c-4c2c-8a4b-57e9d1ef5a91"],
+Cell[12674, 323, 205, 3, 70, "Text",ExpressionUUID->"58f0e86b-4fb4-42e2-b524-68bef482ae54"],
+Cell[12882, 328, 267, 9, 70, "Input",ExpressionUUID->"96df7b1a-1666-439a-93da-b3e382573957"],
+Cell[13152, 339, 111, 0, 70, "Section",ExpressionUUID->"ec2739d7-9b11-46e7-8a23-bc99fdc738d1"],
+Cell[13266, 341, 379, 5, 70, "Text",ExpressionUUID->"a76dd309-3e18-4b9e-acd3-2ce9a0b62f2d"],
+Cell[13648, 348, 98, 0, 70, "Section",ExpressionUUID->"ae855c2a-2104-4253-8a6b-b96156642f3e"],
+Cell[13749, 350, 114, 0, 70, "Text",ExpressionUUID->"ee42c963-d39a-4d6a-9f49-29d4453ae4a3"],
+Cell[13866, 352, 573, 16, 70, "Program",ExpressionUUID->"aad444ad-d1fb-4cc2-9d6b-eec0ff5fba6d"],
+Cell[14442, 370, 210, 3, 70, "Text",ExpressionUUID->"0ef0acaa-8254-4de2-bf53-2868dc19a351"],
+Cell[14655, 375, 85, 0, 70, "Section",ExpressionUUID->"639a1aee-1297-48eb-b0cb-8900894a6029"],
+Cell[14743, 377, 327, 5, 70, "Input",ExpressionUUID->"8d7b761a-aa46-4d2d-a91c-9e39e67572e5"],
+Cell[15073, 384, 89, 0, 70, "Section",ExpressionUUID->"27593910-f8cf-47e0-ae11-dac7a58ad59e"],
+Cell[15165, 386, 471, 9, 70, "Text",ExpressionUUID->"bec1537e-1812-421e-97be-784a52e5f78d"]
+}
+]
+*)
+
+(* End of internal cache information *)

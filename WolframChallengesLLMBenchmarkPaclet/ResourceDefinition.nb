@@ -1,0 +1,56 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 15.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[      1537,         47]
+NotebookOptionsPosition[      1016,         32]
+NotebookOutlinePosition[      1403,         47]
+CellTagsIndexPosition[      1360,         44]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell["Paclet Resource Definition", "Title",ExpressionUUID->"0ddde416-40f1-4012-b037-89fe278777ab"],
+
+Cell[BoxData[
+ RowBox[{"ResourceObject", "[", 
+  RowBox[{"File", "[", "\"\<PacletInfo.wl\>\"", "]"}], "]"}]], "Input",Express\
+ionUUID->"bdc6e7a5-123d-4cb1-8ee0-778fa30a5c8a"],
+
+Cell["\<\
+This notebook is consumed by PacletCICD to register the paclet with the \
+Wolfram Paclet Repository.\
+\>", "Text",ExpressionUUID->"7f1fe296-a7ca-4283-98ca-6f56132a4f87"]
+},
+FrontEndVersion->"15.0 for Mac OS X ARM (64-bit) (February 27, 2026)",
+StyleDefinitions->FrontEnd`FileName[{"Wolfram"}, "Default.nb", 
+  CharacterEncoding -> "UTF-8"],
+ExpressionUUID->"8c0c7eae-a309-4cf3-91ae-f10cb312c158"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[554, 20, 98, 0, 70, "Title",ExpressionUUID->"0ddde416-40f1-4012-b037-89fe278777ab"],
+Cell[655, 22, 175, 3, 70, "Input",ExpressionUUID->"bdc6e7a5-123d-4cb1-8ee0-778fa30a5c8a"],
+Cell[833, 27, 179, 3, 70, "Text",ExpressionUUID->"7f1fe296-a7ca-4283-98ca-6f56132a4f87"]
+}
+]
+*)
+
+(* End of internal cache information *)
