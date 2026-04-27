@@ -43,3 +43,8 @@ scratch/
 
 # Legacy-migration archive (if/when created)
 .legacy-archive/
+
+# Private benchmark data \[LongDash] canonical solutions, held-out tests, etc.
+# Defense-in-depth: even on a private repo we keep these out of git so they
+# can't leak via screenshares, shared zips, or downstream forks.
+private/

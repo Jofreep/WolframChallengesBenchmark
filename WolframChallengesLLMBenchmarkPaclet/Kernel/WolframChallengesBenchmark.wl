@@ -88,6 +88,18 @@ or {HoldComplete[input], expected, <|metadata|>}) and returns an \
 Association of normalized test entries keyed by challenge name. \
 Returns $Failed and emits a tagged Message on shape or parse error.";
 
+LoadChallengesJSONL::usage =
+"LoadChallengesJSONL[path] reads the single-file JSONL benchmark format \
+(one JSON record per line, fields: task_id, name, index, instruction, \
+prompt, entry_point, tests) and returns an Association \
+<|\"challenges\" -> ..., \"testBank\" -> ...|> with the same downstream \
+shape as combining LoadChallenges + LoadTestBank, so callers can swap \
+loaders without touching the runner.  LoadChallengesJSONL[path, \
+privatePath] additionally loads canonical solutions from a private \
+JSONL file when supplied; the returned Association then carries a \
+\"canonicalSolutions\" key.  See docs/CHALLENGES-JSONL-FORMAT.md for \
+the format spec.";
+
 ReconcileNames::usage =
 "ReconcileNames[challenges, testBank] aligns the keys of two banks so \
 that names matching up to case, punctuation, and diacritics share the \
@@ -331,6 +343,21 @@ JofreEspigulePons`WolframChallengesBenchmark`LoadTestBank[path_String] :=
 
 JofreEspigulePons`WolframChallengesBenchmark`LoadTestBank[other_] :=
   loadTestBankImpl[other];
+
+
+(* --- LoadChallengesJSONL ------------------------------------------ *)
+
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[
+    path_String] :=
+  loadChallengesJSONLImpl[path];
+
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[
+    path_String, privatePath_String] :=
+  loadChallengesJSONLImpl[path, privatePath];
+
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[
+    other_, ___] :=
+  loadChallengesJSONLImpl[other];
 
 
 (* --- ReconcileNames ------------------------------------------------ *)

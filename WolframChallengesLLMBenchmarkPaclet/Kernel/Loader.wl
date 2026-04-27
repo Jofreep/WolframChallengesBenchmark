@@ -315,4 +315,175 @@ reconcileNamesImpl[a_, b_] := (
 );
 
 
+(* ------------------------------------------------------------------ *)
+(* LoadChallengesJSONL                                                 *)
+(*                                                                     *)
+(* Reads the single-file benchmark format (challenges.jsonl), one      *)
+(* JSON record per line, and returns                                   *)
+(*                                                                     *)
+(*   <|"challenges" -> Association of task_id -> challenge metadata,  *)
+(*     "testBank"   -> Association of task_id -> list of test entries|> *)
+(*                                                                     *)
+(* Same downstream shape as combining LoadChallenges + LoadTestBank,  *)
+(* so callers can swap loaders without touching the runner.            *)
+(*                                                                     *)
+(* Optional second argument: path to a private canonical-solutions    *)
+(* JSONL file.  When supplied (and file exists), the returned         *)
+(* Association also has a "canonicalSolutions" key mapping            *)
+(* task_id -> source string.  Used by the bank-self-test path.        *)
+(*                                                                     *)
+(* Format reference: docs/CHALLENGES-JSONL-FORMAT.md                  *)
+(* ------------------------------------------------------------------ *)
+
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::notfound =
+  "JSONL file not found: `1`.";
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::parseerr =
+  "Could not parse JSONL line `1` of `2`: `3`.";
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::badrecord =
+  "Record `1` of `2` missing required field: `3`.";
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::heldparse =
+  "Could not parse held WL source string in `1` test #`2`: `3`.";
+JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::badarg =
+  "LoadChallengesJSONL expects a file path string; got `1`.";
+
+(* parseHeldWL: turn an InputForm WL source string into HoldComplete[expr].
+   Wraps ImportString[..., {"WL", "HeldExpressions"}] which returns a list
+   of HoldComplete'd top-level expressions; we take the first.  Returns
+   $Failed on parse error; the caller emits the message with context. *)
+parseHeldWLString[src_String] := Module[{held},
+  held = Quiet @ ImportString[src, {"WL", "HeldExpressions"}];
+  If[! ListQ[held] || held === {} || ! MatchQ[First[held], _HoldComplete],
+    Return[$Failed]
+  ];
+  First[held]
+];
+
+(* parseExpectedString: parse the expected_wl as a value (released).
+   ToExpression handles complex literals like Graph[...], Image[...]. *)
+parseExpectedString[src_String] :=
+  Quiet @ Check[ToExpression[src], $Failed];
+
+loadChallengesJSONLImpl[path_String] :=
+  loadChallengesJSONLImpl[path, None];
+
+loadChallengesJSONLImpl[path_String, privatePath_] := Module[
+  {lines, records, challenges, testBank, canonicalSolutions = None,
+   privLines, privRecords},
+
+  If[! FileExistsQ[path],
+    Message[JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::notfound,
+      path];
+    Return[$Failed]
+  ];
+
+  lines = Quiet @ Check[ReadList[path, "String"], $Failed];
+  If[lines === $Failed, Return[$Failed]];
+
+  records = MapIndexed[
+    Function[{line, idxList},
+      Module[{idx = First[idxList], rec},
+        rec = Quiet @ Check[ImportString[line, "RawJSON"], $Failed];
+        If[! AssociationQ[rec],
+          Message[JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::parseerr,
+            idx, path, StringTake[line, UpTo[80]]];
+          Return[$Failed, Module]
+        ];
+        Scan[
+          If[! KeyExistsQ[rec, #],
+            Message[JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::badrecord,
+              idx, path, #];
+            Return[$Failed, Module]
+          ] &,
+          {"task_id", "prompt", "tests"}
+        ];
+        rec
+      ]
+    ],
+    DeleteCases[lines, ""]
+  ];
+  If[MemberQ[records, $Failed], Return[$Failed]];
+
+  (* Build challenges Association: task_id -> metadata (no tests).
+     NB: parameter must be a plain Symbol \[LongDash] `task_id` would
+     parse as Pattern[task, Blank[id]] and break Function. *)
+  challenges = AssociationMap[
+    Function[taskId,
+      Module[{rec = SelectFirst[records, #["task_id"] === taskId &]},
+        <|
+          "name"        -> Lookup[rec, "name", taskId],
+          "index"       -> Lookup[rec, "index", 0],
+          "instruction" -> Lookup[rec, "instruction", ""],
+          "prompt"      -> rec["prompt"],
+          "entry_point" -> Lookup[rec, "entry_point", ""]
+        |>
+      ]
+    ],
+    #["task_id"] & /@ records
+  ];
+
+  (* Build testBank Association: task_id -> list of <|input, expected, ...|>.
+     Same shape LoadTestBank produces. *)
+  testBank = Association @ Map[
+    Function[rec,
+      Module[{task = rec["task_id"], rawTests, parsedTests, parseFailures},
+        rawTests = Lookup[rec, "tests", {}];
+        parseFailures = {};
+        parsedTests = MapIndexed[
+          Function[{t, ti},
+            Module[{held, exp},
+              held = parseHeldWLString[t["input_wl"]];
+              If[held === $Failed,
+                AppendTo[parseFailures, First[ti]];
+                Message[JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::heldparse,
+                  task, First[ti], StringTake[t["input_wl"], UpTo[60]]];
+                Return[Nothing, Module]
+              ];
+              exp = parseExpectedString[t["expected_wl"]];
+              <|
+                "challengeName" -> task,
+                "testIndex"     -> First[ti],
+                "input"         -> held,
+                "expected"      -> exp,
+                "metadata"      -> Lookup[t, "metadata", <||>]
+              |>
+            ]
+          ],
+          rawTests
+        ];
+        task -> parsedTests
+      ]
+    ],
+    records
+  ];
+
+  (* Optionally load the private canonical-solutions JSONL. *)
+  If[StringQ[privatePath] && FileExistsQ[privatePath],
+    privLines = Quiet @ Check[ReadList[privatePath, "String"], {}];
+    privLines = DeleteCases[privLines, ""];
+    privRecords = DeleteCases[
+      Quiet @ Check[ImportString[#, "RawJSON"], $Failed] & /@ privLines,
+      $Failed];
+    canonicalSolutions = Association @ Map[
+      Function[r, r["task_id"] -> Lookup[r, "canonical_solution", ""]],
+      Select[privRecords, AssociationQ]
+    ];
+  ];
+
+  If[canonicalSolutions =!= None,
+    <|"challenges"         -> challenges,
+      "testBank"           -> testBank,
+      "canonicalSolutions" -> canonicalSolutions|>,
+    <|"challenges" -> challenges,
+      "testBank"   -> testBank|>
+  ]
+];
+
+loadChallengesJSONLImpl[other_, ___] := (
+  Message[
+    JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::badarg,
+    other];
+  $Failed
+);
+
+
 End[];  (* `Private` *)

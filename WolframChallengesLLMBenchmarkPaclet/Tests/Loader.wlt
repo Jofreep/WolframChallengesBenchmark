@@ -232,3 +232,119 @@ VerificationTest[
   {JofreEspigulePons`WolframChallengesBenchmark`ReconcileNames::badarg},
   TestID -> "ReconcileNames/bad-arg"
 ]
+
+
+(* ---------- LoadChallengesJSONL: parses a small fixture --------------- *)
+
+VerificationTest[
+  Module[{path, written, data},
+    path = FileNameJoin[{$tmp, "fixture.jsonl"}];
+    written = StringJoin[
+      "{\"task_id\":\"Sum\",\"name\":\"Sum\",\"index\":1,",
+        "\"instruction\":\"add two\",\"prompt\":\"Define addTwo[a,b].\",",
+        "\"entry_point\":\"addTwo\",",
+        "\"tests\":[",
+          "{\"input_wl\":\"addTwo[1, 2]\",\"expected_wl\":\"3\",\"metadata\":{}},",
+          "{\"input_wl\":\"addTwo[10, 20]\",\"expected_wl\":\"30\",\"metadata\":{}}",
+        "]}\n",
+      "{\"task_id\":\"Sq\",\"name\":\"Sq\",\"index\":2,",
+        "\"instruction\":\"square it\",\"prompt\":\"Define sq[x].\",",
+        "\"entry_point\":\"sq\",",
+        "\"tests\":[",
+          "{\"input_wl\":\"sq[4]\",\"expected_wl\":\"16\",\"metadata\":{}}",
+        "]}\n"
+    ];
+    Export[path, written, "Text", CharacterEncoding -> "UTF-8"];
+    data = JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[path];
+    {Sort @ Keys[data],
+     Sort @ Keys[data["challenges"]],
+     data["challenges", "Sum", "name"],
+     data["challenges", "Sum", "entry_point"],
+     Sort @ Keys[data["testBank"]],
+     Length[data["testBank", "Sum"]],
+     Length[data["testBank", "Sq"]],
+     (* Held input must be HoldComplete[expr], not the released value. *)
+     Head[data["testBank", "Sum"][[1, "input"]]],
+     data["testBank", "Sum"][[1, "expected"]],
+     data["testBank", "Sum"][[2, "expected"]]}
+  ],
+  {Sort @ {"challenges", "testBank"},
+   Sort @ {"Sum", "Sq"}, "Sum", "addTwo",
+   Sort @ {"Sum", "Sq"}, 2, 1, HoldComplete, 3, 30},
+  TestID -> "LoadChallengesJSONL/parses-fixture"
+]
+
+
+(* ---------- LoadChallengesJSONL: optional canonical solutions --------- *)
+
+VerificationTest[
+  Module[{path, privPath, data},
+    path     = FileNameJoin[{$tmp, "pub.jsonl"}];
+    privPath = FileNameJoin[{$tmp, "priv.jsonl"}];
+    Export[path,
+      "{\"task_id\":\"Sum\",\"prompt\":\"p\",\"tests\":[" <>
+      "{\"input_wl\":\"addTwo[1, 2]\",\"expected_wl\":\"3\",\"metadata\":{}}]}\n",
+      "Text", CharacterEncoding -> "UTF-8"];
+    Export[privPath,
+      "{\"task_id\":\"Sum\",\"canonical_solution\":\"addTwo[a_, b_] := a + b\"}\n",
+      "Text", CharacterEncoding -> "UTF-8"];
+    data = JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[
+      path, privPath];
+    {KeyExistsQ[data, "canonicalSolutions"],
+     data["canonicalSolutions", "Sum"]}
+  ],
+  {True, "addTwo[a_, b_] := a + b"},
+  TestID -> "LoadChallengesJSONL/canonical-solutions-optional"
+]
+
+
+(* ---------- LoadChallengesJSONL: missing file errors ------------------ *)
+
+VerificationTest[
+  JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[
+    FileNameJoin[{$tmp, "definitely-not-a-jsonl-file-xyzzy"}]],
+  $Failed,
+  {JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::notfound},
+  TestID -> "LoadChallengesJSONL/missing-file"
+]
+
+
+(* ---------- LoadChallengesJSONL: malformed line errors ---------------- *)
+
+VerificationTest[
+  Module[{path},
+    path = FileNameJoin[{$tmp, "bad.jsonl"}];
+    Export[path,
+      "{\"task_id\":\"Sum\",\"prompt\":\"p\",\"tests\":[]}\n" <>
+      "this is not json at all\n",
+      "Text", CharacterEncoding -> "UTF-8"];
+    Quiet @ JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[path]
+  ],
+  $Failed,
+  TestID -> "LoadChallengesJSONL/malformed-line"
+]
+
+
+(* ---------- LoadChallengesJSONL: missing required field errors -------- *)
+
+VerificationTest[
+  Module[{path},
+    path = FileNameJoin[{$tmp, "noprompt.jsonl"}];
+    Export[path,
+      "{\"task_id\":\"Sum\",\"tests\":[]}\n",
+      "Text", CharacterEncoding -> "UTF-8"];
+    Quiet @ JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[path]
+  ],
+  $Failed,
+  TestID -> "LoadChallengesJSONL/missing-required-field"
+]
+
+
+(* ---------- LoadChallengesJSONL: bad arg type errors ------------------ *)
+
+VerificationTest[
+  JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[42],
+  $Failed,
+  {JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL::badarg},
+  TestID -> "LoadChallengesJSONL/bad-arg"
+]

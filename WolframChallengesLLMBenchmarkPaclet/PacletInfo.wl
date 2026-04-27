@@ -29,6 +29,7 @@ PacletObject[
           "JofreEspigulePons`WolframChallengesBenchmark`$OpenRouterAPIKey",
           "JofreEspigulePons`WolframChallengesBenchmark`LoadChallenges",
           "JofreEspigulePons`WolframChallengesBenchmark`LoadTestBank",
+          "JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL",
           "JofreEspigulePons`WolframChallengesBenchmark`ReconcileNames",
           "JofreEspigulePons`WolframChallengesBenchmark`RunBenchmark",
           "JofreEspigulePons`WolframChallengesBenchmark`DiffRuns",
