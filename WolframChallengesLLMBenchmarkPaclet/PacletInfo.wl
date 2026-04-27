@@ -43,7 +43,8 @@ PacletObject[
           "JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesDir",
           "JofreEspigulePons`WolframChallengesBenchmark`BuildTestBank",
           "JofreEspigulePons`WolframChallengesBenchmark`WriteTestBankFiles",
-          "JofreEspigulePons`WolframChallengesBenchmark`WriteWLChallengeDir"
+          "JofreEspigulePons`WolframChallengesBenchmark`WriteWLChallengeDir",
+          "JofreEspigulePons`WolframChallengesBenchmark`BuildChallengesJSONL"
         }
       },
       {

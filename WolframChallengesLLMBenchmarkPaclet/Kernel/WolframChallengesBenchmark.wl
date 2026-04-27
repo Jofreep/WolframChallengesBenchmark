@@ -193,6 +193,16 @@ file per bank entry into `dir`, suitable for editing and re-building. \
 The emitted :Name: is always the BANK name.  Returns the list of \
 written paths.";
 
+BuildChallengesJSONL::usage =
+"BuildChallengesJSONL[dir, jsonlPath] reads .wlchallenge files from \
+`dir` and emits a single challenges.jsonl in the canonical JSONL \
+format at `jsonlPath`, ready to be loaded by LoadChallengesJSONL.  \
+Replaces the legacy two-step BuildTestBank \[Rule] MigrateToJSONL \
+pipeline.  Canonical solutions are not part of the .wlchallenge \
+format and must be managed separately in private/canonical_solutions.\
+jsonl.  Returns an Association with keys \"jsonl\", \"challenges\", \
+and \"tests\" giving the path written and counts.";
+
 
 (* ------------------------------------------------------------------ *)
 (* Load sub-packages                                                  *)
@@ -453,6 +463,10 @@ JofreEspigulePons`WolframChallengesBenchmark`WriteTestBankFiles[
 JofreEspigulePons`WolframChallengesBenchmark`WriteWLChallengeDir[
     challenges_Association, testBank_Association, dir_String] :=
   writeWLChallengeDirImpl[challenges, testBank, dir];
+
+JofreEspigulePons`WolframChallengesBenchmark`BuildChallengesJSONL[
+    dir_String, jsonlPath_String] :=
+  buildChallengesJSONLImpl[dir, jsonlPath];
 
 
 (* $BenchmarkDefaults: no dispatcher.  The public symbol is declared by

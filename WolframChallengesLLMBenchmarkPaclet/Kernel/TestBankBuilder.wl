@@ -491,4 +491,114 @@ writeWLChallengeDirImpl[challenges_Association, testBank_Association,
   paths
 ];
 
+
+(* ----------------------------------------------------------------------- *)
+(* buildChallengesJSONLImpl \[LongDash] read .wlchallenge files from a    *)
+(* directory and emit a single challenges.jsonl in the canonical format   *)
+(* used by LoadChallengesJSONL.  Replaces the legacy two-step             *)
+(* BuildTestBank \[Rule] MigrateToJSONL pipeline.                         *)
+(*                                                                         *)
+(* The .wlchallenge format intentionally has no canonical-solution        *)
+(* section (those live separately in private/canonical_solutions.jsonl    *)
+(* to keep them out of git-tracked authoring files).  This function       *)
+(* therefore only writes the public challenges.jsonl; canonical solutions *)
+(* are managed independently.                                              *)
+(* ----------------------------------------------------------------------- *)
+
+(* heldEntryToJSONL: turn one bank-row entry (input/expected/metadata
+   association) into the {input_wl, expected_wl, metadata} shape the
+   JSONL loader expects.  Mirrors the migration in MigrateToJSONL.wls
+   so a re-build is byte-for-byte equivalent to a re-migration. *)
+heldEntryToJSONL[entry_Association] := <|
+  "input_wl"    -> heldToInputForm[entry["input"]],
+  "expected_wl" -> ToString[entry["expected"], InputForm,
+                            PageWidth -> Infinity],
+  "metadata"    -> If[AssociationQ[entry["metadata"]],
+                      entry["metadata"], <||>]
+|>;
+
+buildChallengesJSONLImpl[dir_String, jsonlPath_String] := Module[
+  {entries, names, records, stream, n, outDir},
+
+  entries = loadChallengesDirImpl[dir];
+  If[entries === <||>,
+    logWarn["BuildChallengesJSONL: no .wlchallenge files in " <> dir];
+    Return[$Failed]
+  ];
+
+  (* Sort by index, falling back to name for stability when indices tie. *)
+  names = SortBy[Keys[entries],
+    {Lookup[entries[#], "index", 99999], #} &];
+
+  records = Map[
+    Function[name,
+      Module[{e = entries[name], firstInput, entryPoint},
+        (* The bank's "tests" is a list-of-lists: each test is
+           {HoldComplete[input], expected, [metadata]}.  Position [[1,1]]
+           is therefore the first test's HELD input expression. *)
+        firstInput = If[Length[e["tests"]] > 0,
+                        e["tests"][[1, 1]],
+                        Missing["NoTests"]];
+        entryPoint = Replace[firstInput,
+          {
+            HoldComplete[(f_Symbol)[___]] :> SymbolName[Unevaluated[f]],
+            HoldComplete[f_Symbol]        :> SymbolName[Unevaluated[f]],
+            _                             :> ""
+          }
+        ];
+        <|
+          "task_id"     -> name,
+          "name"        -> name,
+          "index"       -> Lookup[e, "index", 0],
+          "instruction" -> Lookup[e, "instruction", ""],
+          "prompt"      -> Lookup[e, "prompt", ""],
+          "entry_point" -> entryPoint,
+          "tests"       -> Map[
+            Function[t,
+              <|
+                "input_wl"    -> heldToInputForm[t[[1]]],
+                "expected_wl" -> ToString[t[[2]], InputForm,
+                                          PageWidth -> Infinity],
+                "metadata"    -> If[Length[t] >= 3 && AssociationQ[t[[3]]],
+                                    t[[3]], <||>]
+              |>
+            ],
+            e["tests"]
+          ]
+        |>
+      ]
+    ],
+    names
+  ];
+
+  outDir = DirectoryName[jsonlPath];
+  If[StringLength[outDir] > 0 && ! DirectoryQ[outDir],
+    CreateDirectory[outDir, CreateIntermediateDirectories -> True]
+  ];
+
+  (* One JSON record per line, compact (no pretty-printing). *)
+  stream = OpenWrite[jsonlPath, CharacterEncoding -> "UTF-8"];
+  Scan[
+    Function[r,
+      WriteString[stream, ExportString[r, "RawJSON", "Compact" -> True], "\n"]
+    ],
+    records
+  ];
+  Close[stream];
+
+  n = Length[records];
+  <|
+    "jsonl"      -> jsonlPath,
+    "challenges" -> n,
+    "tests"      -> Total[Length[#["tests"]] & /@ records]
+  |>
+];
+
+buildChallengesJSONLImpl[other_, _] := (
+  logWarn["BuildChallengesJSONL: first arg must be a directory string; got " <>
+    ToString[Head[other]]];
+  $Failed
+);
+
+
 End[];

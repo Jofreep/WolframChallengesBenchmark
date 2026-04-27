@@ -218,3 +218,65 @@ VerificationTest[
   {2, True, {"Square", "Sum"}, {"Square", "Sum"}, 3, 2, <|"tag" -> "big"|>},
   TestID -> "WriteWLChallengeDir/round-trip"
 ]
+
+
+(* ---------- BuildChallengesJSONL: full pipeline -------------------- *)
+(* End-to-end: read .wlchallenge files from $authorDir -> emit
+   challenges.jsonl -> re-load via LoadChallengesJSONL -> verify the
+   bank shape and contents survive the JSONL round-trip.  This is the
+   one-step replacement for the legacy BuildTestBank \[Rule]
+   MigrateToJSONL pipeline. *)
+
+VerificationTest[
+  Module[{outPath, summary, data, sumTests},
+    outPath = FileNameJoin[{$tmp, "build-jsonl.jsonl"}];
+    summary = JofreEspigulePons`WolframChallengesBenchmark`BuildChallengesJSONL[
+      $authorDir, outPath];
+    {summary["challenges"],
+     summary["tests"],
+     FileExistsQ[outPath],
+     summary["jsonl"] === outPath}
+  ],
+  {2, 5, True, True},
+  TestID -> "BuildChallengesJSONL/writes-jsonl"
+]
+
+
+(* ---------- BuildChallengesJSONL: round-trip via LoadChallengesJSONL --- *)
+
+VerificationTest[
+  Module[{outPath, data, sumTests},
+    outPath = FileNameJoin[{$tmp, "build-jsonl-roundtrip.jsonl"}];
+    JofreEspigulePons`WolframChallengesBenchmark`BuildChallengesJSONL[
+      $authorDir, outPath];
+    data = JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[
+      outPath];
+    sumTests = data["testBank", "Sum"];
+    {Sort @ Keys[data["challenges"]],
+     data["challenges", "Sum", "entry_point"],
+     data["challenges", "Square", "entry_point"],
+     (* The held input must round-trip back as HoldComplete[expr]. *)
+     Head[sumTests[[1, "input"]]],
+     sumTests[[1, "expected"]],
+     (* Metadata on Sum's second test should survive the round-trip. *)
+     sumTests[[2, "metadata"]]}
+  ],
+  {{"Square", "Sum"}, "addTwo", "square",
+   HoldComplete, 3, <|"tag" -> "big"|>},
+  TestID -> "BuildChallengesJSONL/round-trip-via-LoadChallengesJSONL"
+]
+
+
+(* ---------- BuildChallengesJSONL: empty dir returns $Failed ---------- *)
+
+VerificationTest[
+  Module[{emptyDir, outPath},
+    emptyDir = FileNameJoin[{$tmp, "empty-author-dir-jsonl"}];
+    CreateDirectory[emptyDir, CreateIntermediateDirectories -> True];
+    outPath = FileNameJoin[{$tmp, "should-not-be-written.jsonl"}];
+    Quiet @ JofreEspigulePons`WolframChallengesBenchmark`BuildChallengesJSONL[
+      emptyDir, outPath]
+  ],
+  $Failed,
+  TestID -> "BuildChallengesJSONL/empty-dir-fails"
+]
