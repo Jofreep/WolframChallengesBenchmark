@@ -74,8 +74,8 @@ skipLive     = TrueQ @ ToExpression @ Lookup[args, "skip-live", "False"];
 (* Phase-6 (real challenge) knobs.  Defaults match the generator's
    defaults so a bare --challenge NAME reproduces production load.    *)
 challengeArg          = Lookup[args, "challenge",       None];
-challengesFileArg     = Lookup[args, "challenges-file",
-                         FileNameJoin[{Directory[], "ChallengesTestDataV1.json"}]];
+challengesJSONLArg    = Lookup[args, "jsonl",
+                         FileNameJoin[{Directory[], "challenges.jsonl"}]];
 challengeMaxTokensArg = ToExpression @ Lookup[args, "challenge-max-tokens", "16000"];
 challengeTimeoutArg   = ToExpression @ Lookup[args, "challenge-timeout",    "600"];
 
@@ -317,42 +317,31 @@ runChat[suspectArg, 5, "suspect model"];
    generator sends.  We splice the challenge body into {{CHALLENGE}}.    *)
 
 runRealChallenge[challengeName_String] := Module[
-  {challengesPath, challenges, recon, entry, body, fullPrompt,
+  {jsonlPath, data, challenges, entry, body, fullPrompt,
    templateSym, template, result, t0, t1, dt, content, rawResp,
    wallVsLatency},
 
   phase[6, "POST /chat/completions  (REAL CHALLENGE prompt: " <>
             challengeName <> " against " <> suspectArg <> ")"];
 
-  (* --- Load + reconcile challenges --- *)
-  challengesPath = challengesFileArg;
-  If[! FileExistsQ[challengesPath],
-    fail["challenges file not found: " <> challengesPath];
-    info["pass --challenges-file <path> to override"];
+  (* --- Load challenges from the unified JSONL source. --- *)
+  jsonlPath = challengesJSONLArg;
+  If[! FileExistsQ[jsonlPath],
+    fail["challenges JSONL not found: " <> jsonlPath];
+    info["pass --jsonl <path> to override"];
     Return[]
   ];
-  info["loading challenges from: " <> challengesPath];
+  info["loading challenges from: " <> jsonlPath];
 
-  challenges = Quiet @ Check[
-    JofreEspigulePons`WolframChallengesBenchmark`LoadChallenges[challengesPath],
+  data = Quiet @ Check[
+    JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[jsonlPath],
     $Failed
   ];
-  If[! AssociationQ[challenges],
-    fail["LoadChallenges did not return an Association"];
+  If[! AssociationQ[data] || ! AssociationQ[data["challenges"]],
+    fail["LoadChallengesJSONL did not return the expected Association shape"];
     Return[]
   ];
-
-  (* Reconcile so casing matches whichever spelling the user typed. *)
-  Module[{testBankPath, tb},
-    testBankPath = FileNameJoin[{root, "ChallengesTests.wxf"}];
-    If[FileExistsQ[testBankPath],
-      tb = Quiet @ JofreEspigulePons`WolframChallengesBenchmark`LoadTestBank[testBankPath];
-      If[AssociationQ[tb],
-        recon = Quiet @ JofreEspigulePons`WolframChallengesBenchmark`ReconcileNames[
-          challenges, tb];
-        If[AssociationQ[recon] && KeyExistsQ[recon, "challenges"],
-          challenges = recon["challenges"]]]];
-  ];
+  challenges = data["challenges"];
 
   If[! KeyExistsQ[challenges, challengeName],
     fail["no challenge named '" <> challengeName <> "' in " <> challengesPath];

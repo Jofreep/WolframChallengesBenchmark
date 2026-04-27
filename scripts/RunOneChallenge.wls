@@ -40,13 +40,10 @@ pacletDir = FileNameJoin[{root, "WolframChallengesLLMBenchmarkPaclet"}];
 PacletDirectoryLoad[pacletDir];
 Needs["JofreEspigulePons`WolframChallengesBenchmark`"];
 
-challenges = JofreEspigulePons`WolframChallengesBenchmark`LoadChallenges[
-  FileNameJoin[{root, "ChallengesTestDataV1.json"}]];
-testBank = JofreEspigulePons`WolframChallengesBenchmark`LoadTestBank[
-  FileNameJoin[{root, "ChallengesTests.wxf"}]];
-recon = JofreEspigulePons`WolframChallengesBenchmark`ReconcileNames[
-  challenges, testBank];
-challenges = recon["challenges"];
+data = JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[
+  FileNameJoin[{root, "challenges.jsonl"}]];
+challenges = data["challenges"];
+testBank   = data["testBank"];
 
 (* Use the public LoadSolutions paclet symbol instead of walking files
    inline.  It returns the same shape RunBenchmark consumes, plus

@@ -2,23 +2,28 @@
 (* ::Package:: *)
 
 (* BuildTestBank CLI — compile a directory of plain-text .wlchallenge
-   authoring files into the legacy ChallengesTestDataV1.json /
-   ChallengesTests.wxf pair consumed by the runtime, or reverse the
+   authoring files into the legacy JSON + WXF pair, or reverse the
    process to seed a .wlchallenge directory from an existing bank.
 
-   See docs/WLCHALLENGE-FORMAT.md for the file format.
+   STATUS: legacy. The canonical bank source going forward is
+   challenges.jsonl (see docs/CHALLENGES-JSONL-FORMAT.md). This script
+   still works for editing via the .wlchallenge intermediate form, but
+   you'll need to follow it with `MigrateToJSONL.wls` to refresh the
+   JSONL.  A JSONL-native builder is on the list as a follow-up.
+
+   See docs/WLCHALLENGE-FORMAT.md for the .wlchallenge file format.
 
    Forward (build) mode — read .wlchallenge files, emit JSON + WXF:
      wolframscript -file scripts/BuildTestBank.wls \
         --in   .challenges \
-        --json ChallengesTestDataV1.json \
-        --wxf  ChallengesTests.wxf
+        --json out.json \
+        --wxf  out.wxf
 
    Reverse (seed) mode — read an existing bank, emit .wlchallenge files:
      wolframscript -file scripts/BuildTestBank.wls \
         --reverse \
-        --json ChallengesTestDataV1.json \
-        --wxf  ChallengesTests.wxf \
+        --json bank.json \
+        --wxf  bank.wxf \
         --out  .challenges
 
    Exit codes:

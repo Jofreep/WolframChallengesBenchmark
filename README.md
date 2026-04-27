@@ -63,26 +63,32 @@ The harness:
         progress.jsonl           append-only event stream
         report.{html,md,json}    rendered reports
         junit.xml                JUnit XML for CI ingestion
-    ChallengesTestDataV1.json    challenge prompts
-    ChallengesTests.wxf          expected-output test bank
-    docs/WLCHALLENGE-FORMAT.md   .wlchallenge authoring format spec
-    ALTERNATIVE_TESTS.md         design notes on test primitives & monitoring
-    AUDIT.md                     pre-refactor architecture audit
+    challenges.jsonl                     canonical bank (one JSON record per
+                                         line, prompts + tests). Public.
+    private/canonical_solutions.jsonl    canonical reference impls per task.
+                                         Gitignored; defense-in-depth against
+                                         training-set contamination.
+    docs/CHALLENGES-JSONL-FORMAT.md      JSONL schema reference
+    docs/WLCHALLENGE-FORMAT.md           .wlchallenge authoring format spec
+    docs/ci-setup.md                     GitHub Actions / self-hosted runner
+    ALTERNATIVE_TESTS.md                 design notes on test primitives
+    AUDIT.md                             pre-refactor architecture audit
 
 ## Quick start
 
-Run the bundled mini self-test suite to confirm the harness boots:
+Run the paclet's VerificationTest suite to confirm the harness boots:
 
-    wolframscript -file tests/RunTests.wls
+    wolframscript -file WolframChallengesLLMBenchmarkPaclet/Tests/RunTests.wls
 
 Run the full benchmark for one model:
 
     wolframscript -file scripts/RunBenchmark.wls \
-        --challenges ChallengesTestDataV1.json \
-        --testbank   ChallengesTests.wxf \
         --solutions  solutions/claude-opus-4.6 \
         --model      claude-opus-4.6 \
         --out        runs
+
+The benchmark reads `challenges.jsonl` from the current directory by
+default; pass `--jsonl path/to/challenges.jsonl` to override.
 
 Add `--filter Aliquot,FizzBuzz` to focus on a subset, `--parallel 8` to
 override the default of `$ProcessorCount - 1`, `--timeout 30` to cap
@@ -104,24 +110,29 @@ CLI exit codes:
 ## Authoring tests (`.wlchallenge` format)
 
 Tests can be edited as plain-text `.wlchallenge` files, one per
-challenge, and compiled to the JSON + WXF pair the runtime consumes:
+challenge.  This path is currently legacy: it compiles to a JSON + WXF
+pair which then needs `MigrateToJSONL.wls` to refresh
+`challenges.jsonl`. A JSONL-native builder is on the follow-up list.
 
     # build compiled bank from the authoring directory
     wolframscript -file scripts/BuildTestBank.wls \
         --in   .challenges \
-        --json ChallengesTestDataV1.json \
-        --wxf  ChallengesTests.wxf
+        --json bank.json \
+        --wxf  bank.wxf
+
+    # then refresh challenges.jsonl from that pair
+    wolframscript -file scripts/MigrateToJSONL.wls \
+        --in-json bank.json --in-wxf bank.wxf
 
     # seed the authoring directory from an existing compiled bank
     wolframscript -file scripts/BuildTestBank.wls --reverse \
-        --json ChallengesTestDataV1.json \
-        --wxf  ChallengesTests.wxf \
+        --json bank.json \
+        --wxf  bank.wxf \
         --out  .challenges
 
 The builder parses test-input expressions *held* so nothing the
 candidate is asked to compute is ever evaluated at build time; only
-the expected RHS is evaluated (it's the same data already shipping in
-the compiled WXF). See
+the expected RHS is evaluated. See
 [`docs/WLCHALLENGE-FORMAT.md`](docs/WLCHALLENGE-FORMAT.md) for the
 grammar.
 
@@ -137,10 +148,9 @@ does not define the function expected by the test bank is rejected
 before it lands on disk.
 
     wolframscript -file scripts/GenerateSolutions.wls \
-        --challenges   ChallengesTestDataV1.json \
-        --testbank     ChallengesTests.wxf \
         --model-config config/claude-opus-4.6.json \
         --out          solutions
+        # --jsonl challenges.jsonl is the default
 
 Provider choice, model id, temperature, timeout, and retry budget live
 in a JSON config file so the same harness drives any LLMSynthesize
@@ -255,8 +265,9 @@ sidecar carrying a SHA-256 source hash for cache-friendliness.
     PacletDirectoryLoad["WolframChallengesLLMBenchmarkPaclet"];
     Needs["JofreEspigulePons`WolframChallengesBenchmark`"];
 
-    challenges = LoadChallenges["ChallengesTestDataV1.json"];
-    testBank   = LoadTestBank["ChallengesTests.wxf"];
+    data       = LoadChallengesJSONL["challenges.jsonl"];
+    challenges = data["challenges"];
+    testBank   = data["testBank"];
     solutions  = LoadSolutions["solutions/claude-opus-4.6"];
 
     run = RunBenchmark[challenges, testBank, solutions,
@@ -322,13 +333,12 @@ runner and the alternative monitoring patterns that can layer on top.
 
 The pieces you need are already in place:
 
-    # One-shot smoke test of the harness itself
-    wolframscript -file tests/RunTests.wls
+    # The paclet's VerificationTest suite is wired into GitHub Actions
+    # (.github/workflows/tests.yml). See docs/ci-setup.md.
+    wolframscript -file WolframChallengesLLMBenchmarkPaclet/Tests/RunTests.wls
 
     # Nightly regression run, fails the build on any regression
     wolframscript -file scripts/RunBenchmark.wls \
-        --challenges ChallengesTestDataV1.json \
-        --testbank   ChallengesTests.wxf \
         --solutions  solutions/claude-opus-4.6 \
         --model      claude-opus-4.6 \
         --out        runs \

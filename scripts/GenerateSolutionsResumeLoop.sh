@@ -27,9 +27,8 @@
 #
 # The wrapper requires these GenerateSolutions args in the forwarded
 # flags (or it falls back to the defaults shown):
-#   --challenges ChallengesTestDataV1.json
-#   --testbank   ChallengesTests.wxf
-#   --out        solutions
+#   --jsonl        challenges.jsonl
+#   --out          solutions
 #   --api-key-file ~/.config/openrouter/key.txt
 #
 # Every iteration writes its own timestamped log and jsonl under runs/,
@@ -48,8 +47,7 @@ MAX_RESUMES=6
 MODEL=""
 # Forwarded args default set.
 declare -a FWD=()
-CHALLENGES_DEFAULT="ChallengesTestDataV1.json"
-TESTBANK_DEFAULT="ChallengesTests.wxf"
+JSONL_DEFAULT="challenges.jsonl"
 OUT_DEFAULT="solutions"
 API_KEY_FILE_DEFAULT="$HOME/.config/openrouter/key.txt"
 
@@ -70,8 +68,7 @@ fi
 
 # Fill in GenerateSolutions defaults if caller didn't pass them.
 has_flag() { local flag="$1"; shift; for a in "$@"; do [[ "$a" == "$flag" ]] && return 0; done; return 1; }
-has_flag --challenges   "${FWD[@]}" || FWD+=(--challenges   "$CHALLENGES_DEFAULT")
-has_flag --testbank     "${FWD[@]}" || FWD+=(--testbank     "$TESTBANK_DEFAULT")
+has_flag --jsonl        "${FWD[@]}" || FWD+=(--jsonl        "$JSONL_DEFAULT")
 has_flag --out          "${FWD[@]}" || FWD+=(--out          "$OUT_DEFAULT")
 has_flag --api-key-file "${FWD[@]}" || FWD+=(--api-key-file "$API_KEY_FILE_DEFAULT")
 

@@ -11,16 +11,15 @@
                 \[Rule] SaveSolution test-bank audit (refuses bad code)
                 \[Rule] JSONL audit log (every attempt)
 
-   The script calls ReconcileNames before handing off so that the prompts
-   bank and the test bank use the same canonical challenge names, even
-   when they diverge by case/punctuation/diacritics.
+   The single-file challenges.jsonl source already has unified names
+   (the migration applied ReconcileNames at build time), so the script
+   does not call ReconcileNames anymore.
 
    Usage:
      wolframscript -file scripts/GenerateSolutions.wls \
-       --challenges ChallengesTestDataV1.json \
-       --testbank   ChallengesTests.wxf      \
        --out        solutions               \
        --model      minimax/minimax-m2.7   \
+       [--jsonl     challenges.jsonl] \
        [--max-tokens 4096] [--temperature 0.0] \
        [--filter FizzBuzz,Palindromes]       \
        [--limit 10]                          \
@@ -28,8 +27,7 @@
        [--retry-base-delay 2.0]              \
        [--overwrite] [--dry-run] [--save-raw] \
        [--log path/to/generate.jsonl]        \
-       [--api-key-file ~/.config/openrouter/key.txt] \
-       [--no-reconcile]
+       [--api-key-file ~/.config/openrouter/key.txt]
 
    Authentication:
      OpenRouter API key is read from the OPENROUTER_API_KEY environment
@@ -89,10 +87,10 @@ toReal[v_, fallback_] := Module[{x = Quiet @ ToExpression[ToString[v]]},
 printHelp[] := WriteString[$Output,
   "GenerateSolutions.wls \[LongDash] LLM solution generator (OpenRouter)\n\n",
   "Required:\n",
-  "  --challenges PATH      JSON file of challenge prompts\n",
-  "  --testbank   PATH      WXF file of expected outputs\n",
   "  --out        DIR       solutions root (solutions go into <out>/<modelSlug>/)\n",
   "  --model      STRING    OpenRouter model id, e.g. minimax/minimax-m2.7\n\n",
+  "Bank source:\n",
+  "  --jsonl      PATH      challenges.jsonl (default: ./challenges.jsonl)\n\n",
   "LLM options:\n",
   "  --max-tokens    N      default 4096 (reasoning models need > 1000)\n",
   "  --temperature   X      default 0.0\n",
@@ -105,8 +103,7 @@ printHelp[] := WriteString[$Output,
   "  --overwrite            regenerate even if <name>.wl already exists\n",
   "  --dry-run              don't hit the LLM; emit audit-rejecting stubs\n",
   "  --save-raw             also write <name>.raw.txt with the un-extracted reply\n",
-  "  --log PATH             override JSONL audit log location\n",
-  "  --no-reconcile         skip ReconcileNames (use only if banks already align)\n\n",
+  "  --log PATH             override JSONL audit log location\n\n",
   "Auth:\n",
   "  OPENROUTER_API_KEY     env var (default source)\n",
   "  --api-key-file PATH    plain-text file containing the key\n\n",
@@ -165,10 +162,10 @@ modelSlug[model_String] := StringReplace[model,
 (* ----------------------------------------------------------------------- *)
 
 main[] := Module[
-  {args, apiKey, challengesPath, testBankPath, outRoot, model,
+  {args, apiKey, jsonlPath, outRoot, model,
    maxTokens, temperature, timeout, retries, retryBase,
    overwrite, dryRun, saveRaw, logPath, filterArg, limit, filter,
-   noReconcile, challenges, testBank, recon, outDir, opts, result,
+   data, challenges, testBank, outDir, opts, result,
    counts, exitCode = 0},
 
   args = parseArgs[Drop[$ScriptCommandLine, 1]];
@@ -178,15 +175,13 @@ main[] := Module[
 
   bootPaclet[];
 
-  challengesPath = requireArg[args, "challenges"];
-  testBankPath   = requireArg[args, "testbank"];
-  outRoot        = requireArg[args, "out"];
-  model          = requireArg[args, "model"];
+  jsonlPath = withDefault[args, "jsonl",
+                FileNameJoin[{Directory[], "challenges.jsonl"}]];
+  outRoot   = requireArg[args, "out"];
+  model     = requireArg[args, "model"];
 
-  If[! FileExistsQ[challengesPath],
-    abort[1, "--challenges file not found: " <> challengesPath]];
-  If[! FileExistsQ[testBankPath],
-    abort[1, "--testbank file not found: "   <> testBankPath]];
+  If[! FileExistsQ[jsonlPath],
+    abort[1, "--jsonl file not found: " <> jsonlPath]];
 
   maxTokens   = toInt[ withDefault[args, "max-tokens", 4096], 4096];
   temperature = toReal[withDefault[args, "temperature", 0.0], 0.0];
@@ -199,8 +194,6 @@ main[] := Module[
                   truthy[withDefault[args, "dry-run", "true"]];
   saveRaw     = KeyExistsQ[args, "save-raw"] &&
                   truthy[withDefault[args, "save-raw", "true"]];
-  noReconcile = KeyExistsQ[args, "no-reconcile"] &&
-                  truthy[withDefault[args, "no-reconcile", "true"]];
   filterArg   = Lookup[args, "filter", None];
   filter      = If[filterArg === None, All, StringSplit[filterArg, ","]];
   limit       = toInt[ withDefault[args, "limit", 0], 0];
@@ -216,28 +209,11 @@ main[] := Module[
 
   outDir = FileNameJoin[{outRoot, modelSlug[model]}];
 
-  WriteString[$Output, "Loading challenges from ", challengesPath, " ...\n"];
-  challenges = JofreEspigulePons`WolframChallengesBenchmark`LoadChallenges[challengesPath];
-  If[challenges === $Failed, Exit[1]];
-
-  WriteString[$Output, "Loading test bank from ", testBankPath, " ...\n"];
-  testBank = JofreEspigulePons`WolframChallengesBenchmark`LoadTestBank[testBankPath];
-  If[testBank === $Failed, Exit[1]];
-
-  If[!noReconcile,
-    recon = JofreEspigulePons`WolframChallengesBenchmark`ReconcileNames[
-      challenges, testBank];
-    If[! AssociationQ[recon],
-      abort[4, "ReconcileNames did not return an Association"]
-    ];
-    WriteString[$Output,
-      "ReconcileNames: matched=", recon["summary", "matched"],
-      ", renamed=", recon["summary", "renamed"],
-      ", unmatchedChallenges=", recon["summary", "unmatchedChallenges"],
-      ", unmatchedTestBank=", recon["summary", "unmatchedTestBank"],
-      "\n"];
-    challenges = recon["challenges"]
-  ];
+  WriteString[$Output, "Loading challenges + test bank from ", jsonlPath, " ...\n"];
+  data = JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[jsonlPath];
+  If[data === $Failed, Exit[1]];
+  challenges = data["challenges"];
+  testBank   = data["testBank"];
 
   If[ListQ[filter],
     filter = Select[filter, StringQ[#] && StringLength[#] > 0 &];

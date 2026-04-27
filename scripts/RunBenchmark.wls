@@ -1,15 +1,14 @@
 #!/usr/bin/env wolframscript
 (* ::Package:: *)
 
-(* ChallengesBenchmark CLI runner.
+(* WolframChallengesBenchmark CLI runner.
 
    Usage:
      wolframscript -file scripts/RunBenchmark.wls \
-        --challenges ChallengesTestDataV1.json \
-        --testbank   ChallengesTests.wxf \
         --solutions  solutions/claude-opus-4.6 \
         --model      claude-opus-4.6 \
-        --out        runs \
+        [--jsonl     challenges.jsonl] \
+        [--out       runs] \
         [--filter Aliquot,FizzBuzz] \
         [--parallel 8] \
         [--timeout 60] \
@@ -75,19 +74,19 @@ Needs["JofreEspigulePons`WolframChallengesBenchmark`"];
 (* ----------------------------------------------------------------------- *)
 
 main[] := Module[
-  {args, challengesPath, testBankPath, solutionsDir, model, outDir,
+  {args, jsonlPath, solutionsDir, model, outDir,
    filter, parallel, timeout, memory, isolation, retryOnDeath, sandbox,
    verifySolutionsFlag, strictVerify, baselinePath, failUnder,
    junitPath,
-   challenges, testBank, solutions, verifyReport, run, reportPaths,
+   data, challenges, testBank, solutions, verifyReport, run, reportPaths,
    baseline, diff, exitCode = 0},
 
   args = parseArgs[Drop[$ScriptCommandLine, 1]];   (* drop script name *)
 
-  challengesPath = requireKey[args, "challenges"];
-  testBankPath   = requireKey[args, "testbank"];
-  solutionsDir   = requireKey[args, "solutions"];
-  model          = requireKey[args, "model"];
+  jsonlPath    = withDefault[args, "jsonl",
+                  FileNameJoin[{Directory[], "challenges.jsonl"}]];
+  solutionsDir = requireKey[args, "solutions"];
+  model        = requireKey[args, "model"];
 
   outDir       = withDefault[args, "out", FileNameJoin[{Directory[], "runs"}]];
   parallel     = ToExpression @ withDefault[args, "parallel", "Automatic"];
@@ -112,13 +111,11 @@ main[] := Module[
     All
   ];
 
-  WriteString[$Output, "Loading challenges from ", challengesPath, "...\n"];
-  challenges = JofreEspigulePons`WolframChallengesBenchmark`LoadChallenges[challengesPath];
-  If[challenges === $Failed, Exit[1]];
-
-  WriteString[$Output, "Loading test bank from ", testBankPath, "...\n"];
-  testBank = JofreEspigulePons`WolframChallengesBenchmark`LoadTestBank[testBankPath];
-  If[testBank === $Failed, Exit[1]];
+  WriteString[$Output, "Loading challenges + test bank from ", jsonlPath, "...\n"];
+  data = JofreEspigulePons`WolframChallengesBenchmark`LoadChallengesJSONL[jsonlPath];
+  If[data === $Failed, Exit[1]];
+  challenges = data["challenges"];
+  testBank   = data["testBank"];
 
   WriteString[$Output, "Loading solutions from ", solutionsDir, "...\n"];
   solutions = JofreEspigulePons`WolframChallengesBenchmark`LoadSolutions[solutionsDir];
