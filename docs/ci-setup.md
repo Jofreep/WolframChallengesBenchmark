@@ -79,6 +79,47 @@ ships a commented-out `paclet-tests-docker` job that runs on a regular
 3. Uncomment the `paclet-tests-docker:` block in `tests.yml` and remove
    the `if: false` guard.
 
+## Bank self-test job
+
+The workflow has a second job (`bank-self-test`) that runs every
+canonical reference solution against its own tests. Catches bank-edit
+mistakes (e.g. wrong `expected_wl`) before they leak into a real
+model run.
+
+Canonical solutions live in `private/canonical_solutions.jsonl`,
+gitignored. The job stages them from a stable local path on the
+runner machine, defaulting to `~/wclb-private/canonical_solutions.jsonl`.
+
+### One-time setup
+
+```
+mkdir -p ~/wclb-private
+cp ~/Documents/Claude/Projects/WolframChallengesBenchmark/private/canonical_solutions.jsonl \
+   ~/wclb-private/
+```
+
+Refresh `~/wclb-private/canonical_solutions.jsonl` whenever you
+regenerate the canonical set.
+
+### Job behavior
+
+- If `~/wclb-private/canonical_solutions.jsonl` is **present**, the
+  job copies it into the workspace, runs `scripts/BankSelfTest.wls`,
+  and fails with exit 2 if any canonical doesn't pass its own bank
+  entry.
+- If the file is **missing**, the job logs a "skipping" notice and
+  exits cleanly. CI never blocks on machines that don't have the
+  private file (so any future hosted-runner job stays green).
+
+### Override the local path
+
+Set the repo-level Actions variable `BANK_PRIVATE_DIR` to point at a
+different directory:
+
+Settings → Secrets and variables → Actions → Variables →
+New repository variable: name `BANK_PRIVATE_DIR`, value e.g.
+`/Volumes/PrivateBenchData`.
+
 ## Manual runs
 
 - From the repo on github.com: **Actions** → **Tests** → **Run workflow**.

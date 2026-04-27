@@ -79,6 +79,72 @@ jobs:
           include_passed: false
           fail_on_failure: true
 
+  # -----------------------------------------------------------------------
+  # Bank self-test: run every canonical reference solution against its own
+  # tests.  Catches bank-edit mistakes (wrong expected_wl, drifted
+  # canonical) before they leak into a real model run.
+  #
+  # The canonical solutions live in private/canonical_solutions.jsonl,
+  # which is gitignored.  In CI we materialize them from a stable local
+  # path on the runner machine (BANK_PRIVATE_DIR env, default
+  # ~/wclb-private) and copy into the runner workspace.  Refresh with:
+  #   mkdir -p ~/wclb-private
+  #   cp private/canonical_solutions.jsonl ~/wclb-private/
+  # whenever you regenerate the canonical set.
+  # -----------------------------------------------------------------------
+  bank-self-test:
+    name: Bank self-test (canonical solutions pass their own tests)
+    runs-on: [self-hosted, macOS]
+    needs: paclet-tests
+    timeout-minutes: 30
+    env:
+      LANG:     en_US.UTF-8
+      LC_ALL:   en_US.UTF-8
+      LC_CTYPE: UTF-8
+      BANK_PRIVATE_DIR: ${{ vars.BANK_PRIVATE_DIR }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Stage private canonical solutions
+        id: stage
+        # Copy the gitignored canonical_solutions.jsonl from a stable path
+        # on the runner host into the runner workspace.  Skip the rest of
+        # the job (without failing) if the file is not present locally so
+        # this never blocks CI on machines that don't have it.
+        run: |
+          PRIV_DIR="${BANK_PRIVATE_DIR:-$HOME/wclb-private}"
+          PRIV_FILE="$PRIV_DIR/canonical_solutions.jsonl"
+          if [[ ! -f "$PRIV_FILE" ]]; then
+            echo "Canonical file not present at $PRIV_FILE -- skipping bank self-test."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p private
+          cp "$PRIV_FILE" private/canonical_solutions.jsonl
+          echo "Staged $(wc -l < private/canonical_solutions.jsonl) canonical solution records."
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Run bank self-test
+        if: steps.stage.outputs.skip != 'true'
+        # --fail-under gates CI on the DELTA from the current baseline,
+        # not the absolute pass count.  Current baseline is ~0.39 (60 of
+        # 166 challenges have empty canonicals + a long tail of parse
+        # errors and value drift); 0.35 leaves ~4% headroom.  Bank
+        # curation to lift the absolute number is tracked separately.
+        run: |
+          wolframscript -file scripts/BankSelfTest.wls --fail-under 0.35
+
+      - name: Upload self-test report
+        if: always() && steps.stage.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bank-self-test-report
+          path: runs/bank-self-test/
+          if-no-files-found: warn
+          retention-days: 30
+
 # ---------------------------------------------------------------------------
 # Docker-hosted alternative (commented out until a Wolfram Engine for
 # Developers entitlement is stored as secrets.WOLFRAM_ENGINE_ENTITLEMENT).

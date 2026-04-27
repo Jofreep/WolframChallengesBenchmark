@@ -36,6 +36,9 @@ config/secrets.json
 runs/*.stdout.log
 runs/*.stderr.log
 
+# Bank self-test artifacts (CI uploads them per-run; no value in committing).
+runs/bank-self-test/
+
 # Temp/scratch
 tmp/
 scratch/
