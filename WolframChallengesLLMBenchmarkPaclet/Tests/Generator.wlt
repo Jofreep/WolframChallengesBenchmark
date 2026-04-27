@@ -52,6 +52,55 @@ VerificationTest[
 ]
 
 
+(* Regression test: when SaveSolution refuses to write because the
+   audit fails, the JSONL audit-rejection record must carry enough
+   information to triage the rejection without re-running the audit
+   by hand.  Specifically:
+     - definedNames, expectedNames, auditOk diagnostic fields
+     - extractedDumpPath pointing at a .audit-rejected.raw.txt sidecar
+       file containing the FULL extracted source (so the JSONL stays
+       readable when the LLM emits multi-KB pathological responses)
+     - extractedPreview field with the first 1 KB inline (or the full
+       text if it's small)
+     - NO "extracted" field bloating the JSONL with the full body
+
+   Triggered by the same dry-run path as the test above: the stub
+   generator emits "(* dry-run *)" which doesn't define addTwo/sq,
+   so the audit gate rejects both. *)
+VerificationTest[
+  Module[{outDir, lines, events, rec, dumpPath},
+    outDir = FileNameJoin[{$tmp, "dry-audit-diag"}];
+    JofreEspigulePons`WolframChallengesBenchmark`GenerateSolutions[
+      challenges, testBank,
+      <|"Model"           -> "dry/audit-diag",
+        "OutputDirectory" -> outDir,
+        "DryRun"          -> True|>];
+    lines = ReadList[First @ FileNames["*.jsonl", outDir], "String"];
+    events = DeleteCases[Quiet @ ImportString[#, "RawJSON"] & /@ lines, $Failed];
+    rec = First @ Select[events,
+      Lookup[#, "event", ""] === "challenge.auditRejected" &];
+    dumpPath = Lookup[rec, "extractedDumpPath", None];
+    {
+      (* Diagnostic fields are present and well-typed. *)
+      KeyExistsQ[rec, "definedNames"]    && ListQ[rec["definedNames"]],
+      KeyExistsQ[rec, "expectedNames"]   && ListQ[rec["expectedNames"]]
+                                          && rec["expectedNames"] =!= {},
+      KeyExistsQ[rec, "auditOk"]         && rec["auditOk"] === False,
+      (* The full extracted lives in a sidecar, not in the JSONL. *)
+      KeyExistsQ[rec, "extractedDumpPath"] && StringQ[dumpPath]
+                                            && FileExistsQ[dumpPath],
+      KeyExistsQ[rec, "extractedPreview"] && StringQ[rec["extractedPreview"]],
+      (* Old "extracted" field is gone (was bloating multi-KB rows). *)
+      ! KeyExistsQ[rec, "extracted"]
+    }
+  ],
+  {True, True, True, True, True, True},
+  {JofreEspigulePons`WolframChallengesBenchmark`SaveSolution::saveAudit,
+   JofreEspigulePons`WolframChallengesBenchmark`SaveSolution::saveAudit},
+  TestID -> "GenerateSolutions/audit-rejection-carries-diagnostic"
+]
+
+
 (* JSONL log captures the lifecycle events. *)
 VerificationTest[
   Module[{outDir, logFile, lines, events},

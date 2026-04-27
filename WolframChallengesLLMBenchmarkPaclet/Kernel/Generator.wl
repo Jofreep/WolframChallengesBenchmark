@@ -429,21 +429,62 @@ Module[{
   savePath = saveSolutionImpl[saveDir, name, extracted, testBank, extraMeta];
 
   If[savePath === $Failed,
-    outcomeRec = <|
-      "status"         -> "audit-rejected",
-      "name"           -> name,
-      "responseHash"   -> responseHash,
-      "promptHash"     -> promptHash,
-      "extractedBytes" -> StringLength[extracted],
-      "attempts"       -> Length[callResult["attempts"]]
-    |>;
-    If[logPath =!= None,
-      appendJSONL[logPath, Join[
-        <|"event" -> "challenge.auditRejected", "extracted" -> extracted|>,
-        outcomeRec
-      ]]
-    ];
-    Return[outcomeRec]
+    Module[{definedNames, expectedNames, auditOk, dumpPath, preview,
+            previewBytes = 1024},
+      (* Recompute the audit diagnostic so the JSONL log explains WHY
+         the save was refused.  Without this, a triager has to re-extract
+         the code from the log and re-run the audit by hand.  Both
+         helpers are HoldComplete-safe and never evaluate the candidate
+         source. *)
+      definedNames  = Quiet @ Check[definedFunctionNames[extracted], {}];
+      expectedNames = Quiet @ Check[expectedFunctionNames[testBank, name], {}];
+      auditOk       = ListQ[definedNames] && ListQ[expectedNames] &&
+                      definedNames =!= {} && expectedNames =!= {} &&
+                      IntersectingQ[definedNames, expectedNames];
+
+      (* Dump the full extracted source to a sidecar file so the JSONL
+         doesn't bloat with multi-KB pathological responses (gemini's
+         ValidParentheses output was 40 KB of recursively nested
+         StringMatchQ).  The JSONL keeps a 1 KB preview + the path. *)
+      dumpPath = If[DirectoryQ[saveDir],
+        Module[{p = FileNameJoin[{saveDir,
+                  safeSlug[name] <> ".audit-rejected.raw.txt"}]},
+          Quiet @ Export[p, extracted, "Text", CharacterEncoding -> "UTF-8"];
+          p
+        ],
+        None
+      ];
+
+      preview = If[StringLength[extracted] > previewBytes,
+        StringTake[extracted, previewBytes] <>
+          "\n... (truncated, " <> ToString[StringLength[extracted]] <>
+          " chars; full body in " <> ToString[dumpPath] <> ")",
+        extracted
+      ];
+
+      outcomeRec = <|
+        "status"          -> "audit-rejected",
+        "name"            -> name,
+        "responseHash"    -> responseHash,
+        "promptHash"      -> promptHash,
+        "extractedBytes"  -> StringLength[extracted],
+        "attempts"        -> Length[callResult["attempts"]],
+        "auditOk"         -> auditOk,
+        "definedNames"    -> definedNames,
+        "expectedNames"   -> expectedNames,
+        "extractedPreview"-> preview
+      |>;
+      If[StringQ[dumpPath],
+        outcomeRec = Append[outcomeRec, "extractedDumpPath" -> dumpPath]];
+
+      If[logPath =!= None,
+        appendJSONL[logPath, Join[
+          <|"event" -> "challenge.auditRejected"|>,
+          outcomeRec
+        ]]
+      ];
+      Return[outcomeRec]
+    ]
   ];
 
   (* Optional forensic replay file for raw, un-extracted response. *)
