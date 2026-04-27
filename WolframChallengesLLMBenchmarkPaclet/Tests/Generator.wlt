@@ -154,21 +154,33 @@ VerificationTest[
 ]
 
 
-(* Tombstone on abort: if the driver loop is aborted partway through,
-   a generate.aborted row still lands so logs aren't silently truncated.
-   We simulate the abort with a generator that Abort[]s on its first call,
-   then CheckAbort the top-level call so the test harness isn't torn down. *)
+(* Tombstone on abort: if the driver loop is interrupted partway
+   through (Ctrl-C, an Exit triggered by an outer handler, a Throw
+   escaping a tagged Catch the caller forgot to install, etc.), a
+   generate.aborted row still lands so logs aren't silently truncated.
+
+   We simulate the interrupt with a Generator that throws to a tagged
+   Catch around the GenerateSolutions call.  Why Throw and not Abort:
+   the per-attempt envelope wraps `gen[prompt]` in CheckAbort to recover
+   from URLRead aborts on flaky TCP \[LongDash] so an Abort[] from the
+   Generator is *correctly* swallowed, retried, and recorded as
+   status="llm-aborted" without ever reaching the WithLocalSettings
+   cleanup that emits the tombstone.  CheckAbort does NOT catch Throw,
+   so a Throw propagates through processOneChallenge, MapIndexed, and
+   triggers the cleanup body (which writes the generate.aborted row),
+   then bubbles up to the test's outer Catch. *)
 VerificationTest[
   Module[{outDir, result, jsonl, lines, events, aborted, finished},
     outDir = FileNameJoin[{$tmp, "dry-abort"}];
-    result = CheckAbort[
+    result = Catch[
       JofreEspigulePons`WolframChallengesBenchmark`GenerateSolutions[
         challenges, testBank,
         <|"Model"           -> "dry/abort",
           "OutputDirectory" -> outDir,
           "DryRun"          -> False,
-          "Generator"       -> Function[prompt, Abort[]]|>],
-      "caught"];
+          "Generator"       ->
+            Function[prompt, Throw["interrupted", "test-abort"]]|>],
+      "test-abort"];
     jsonl = First @ FileNames["*.jsonl", outDir];
     lines = ReadList[jsonl, "String"];
     events = DeleteCases[Quiet @ ImportString[#, "RawJSON"] & /@ lines, $Failed];
@@ -176,7 +188,7 @@ VerificationTest[
       AssociationQ[#] && Lookup[#, "event", ""] === "generate.aborted" &];
     finished = Select[events,
       AssociationQ[#] && Lookup[#, "event", ""] === "generate.finished" &];
-    {result === "caught", Length[aborted] === 1, Length[finished] === 0,
+    {result === "interrupted", Length[aborted] === 1, Length[finished] === 0,
      (* The tombstone identifies the challenge that was in flight. *)
      StringQ @ Lookup[First[aborted], "lastName", None]}
   ],

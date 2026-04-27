@@ -50,15 +50,9 @@ jobs:
 
       - name: Run paclet test suite
         id: tests
-        # GenerateSolutions/aborted-tombstone is a known-failing test that
-        # predates the paclet migration; it's allowlisted here so CI gates
-        # on the delta, not the absolute pass count. Remove from
-        # --expected-failures once the underlying tombstone emission issue
-        # is diagnosed and fixed (tracked separately from the CI setup).
         run: |
           wolframscript -file WolframChallengesLLMBenchmarkPaclet/Tests/RunTests.wls \
-            --junit junit.xml \
-            --expected-failures "GenerateSolutions/aborted-tombstone"
+            --junit junit.xml
         env:
           # OpenRouter integration tests use the env var if set; without it,
           # those tests still pass (they're structured to degrade gracefully)
