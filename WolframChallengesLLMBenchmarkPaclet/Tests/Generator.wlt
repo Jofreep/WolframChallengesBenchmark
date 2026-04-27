@@ -195,3 +195,69 @@ VerificationTest[
   {True, True, True, True},
   TestID -> "GenerateSolutions/aborted-tombstone"
 ]
+
+
+(* CheckAbort hardening on the per-attempt envelope.
+
+   The per-attempt path at Generator.wl:194-200 wraps `gen[prompt]` in
+   CheckAbort to recover from URLRead aborts on flaky TCP connections
+   (observed on macOS).  Without this, one bad HTTPS call would Abort
+   the whole multi-challenge run even though the per-attempt envelope
+   already has a TimeConstrained safety net.
+
+   This test locks in the recovery behavior so a future refactor can't
+   silently drop the CheckAbort.  We use Abort[] (not Throw) because
+   Abort is exactly what CheckAbort catches \[LongDash] this is the
+   /complementary/ case to the tombstone test above:
+
+     - Throw  -> escapes CheckAbort  -> tombstone fires (above test)
+     - Abort  -> caught by CheckAbort -> retried, run completes
+                                          (this test)
+
+   We assert the full recovery chain:
+     1. The whole call returns normally (no abort propagates).
+     2. Each per-attempt envelope records status="aborted".
+     3. Each challenge after maxAttempts retries records status="llm-aborted".
+     4. The run completes with generate.finished, NOT generate.aborted
+        (the recovery layer's whole point is the run keeps going).
+     5. The driver visits both challenges (it doesn't bail after the
+        first abort).                                                   *)
+VerificationTest[
+  Module[{outDir, result, jsonl, lines, events, attemptEnds, challengeEnds,
+          finished, aborted, perChallenge},
+    outDir = FileNameJoin[{$tmp, "abort-recovers"}];
+    result = JofreEspigulePons`WolframChallengesBenchmark`GenerateSolutions[
+      challenges, testBank,
+      <|"Model"           -> "dry/abort-recovers",
+        "OutputDirectory" -> outDir,
+        "DryRun"          -> False,
+        "MaxAttempts"     -> 2,    (* faster than the default 3 *)
+        "RetryBaseDelay"  -> 0,    (* no exponential backoff in tests *)
+        "Generator"       -> Function[prompt, Abort[]]|>];
+
+    jsonl  = First @ FileNames["*.jsonl", outDir];
+    lines  = ReadList[jsonl, "String"];
+    events = DeleteCases[Quiet @ ImportString[#, "RawJSON"] & /@ lines, $Failed];
+
+    attemptEnds   = Select[events, Lookup[#, "event", ""] === "challenge.attempt.end" &];
+    challengeEnds = Select[events, Lookup[#, "event", ""] === "challenge.failed" &];
+    finished      = Select[events, Lookup[#, "event", ""] === "generate.finished" &];
+    aborted       = Select[events, Lookup[#, "event", ""] === "generate.aborted" &];
+    perChallenge  = result["results"];
+
+    {
+      (* (1) Whole call returned normally. *)
+      AssociationQ[result],
+      (* (2) Each attempt env recorded status="aborted". *)
+      AllTrue[attemptEnds, Lookup[#, "status", ""] === "aborted" &],
+      (* (3) Each challenge ended as llm-aborted after retries. *)
+      AllTrue[Values[perChallenge], #["status"] === "llm-aborted" &],
+      (* (4) Tombstone is generate.finished, NOT generate.aborted. *)
+      Length[finished] === 1, Length[aborted] === 0,
+      (* (5) Driver visited BOTH challenges (didn't stop after the first). *)
+      Sort @ Keys[perChallenge]
+    }
+  ],
+  {True, True, True, True, True, Sort @ {"Sum", "Sq"}},
+  TestID -> "GenerateSolutions/abort-recovers-via-CheckAbort"
+]
