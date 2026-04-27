@@ -186,6 +186,42 @@ VerificationTest[
 ]
 
 
+(* ---------- Messages-but-no-abort: candidate runs to completion --- *)
+(*
+  Regression test for the "sandbox threw" misclassification observed in
+  gemini-2.5-flash's PermutationIndex run (2026-04-22 17:11 UTC):
+  PermutationIndex[5, 720] makes the candidate compute idx = Quotient[
+  719, 24] = 29 and then call remaining[[30]] on a 5-element list. Wolfram
+  fires Part::partw and Delete::partw repeatedly, then the candidate
+  returns a malformed expression containing unevaluated Delete[Delete[...]
+  fragments. The pre-fix runner classified the row as RunnerError ("sandbox
+  threw") because a Check wrapper at the InProcess layer triggered on the
+  candidate's messages. The fix (#54) was to drop that Check so candidate
+  messages no longer poison the row \[LongDash] the test now correctly
+  grades as Evaluated/passed=False with messageCount > 0.
+
+  We simulate the same shape with `addTwo[a_,b_] := First[{}]`: First
+  fires First::nofirst, returns First[{}] symbolically, and the candidate
+  completes evaluation. Status must be "Evaluated" (not "RunnerError"),
+  passed must be False, and messageCount must be \[GreaterEqual] 1.
+*)
+
+VerificationTest[
+  Module[{sol, run, r},
+    sol = <|"Sum" -> <|"code" -> "addTwo[a_, b_] := First[{}]"|>|>;
+    run = Quiet @ JofreEspigulePons`WolframChallengesBenchmark`RunBenchmark[
+      challenges, testBank, sol,
+      "Model" -> "t/messages-no-abort",
+      "IsolationMode" -> "InProcess",
+      "OutputDirectory" -> $tmp, "TimeConstraint" -> 10];
+    r = First[run["results"]];
+    {r["status"], r["passed"], r["messageCount"] >= 1}
+  ],
+  {"Evaluated", False, True},
+  TestID -> "RunBenchmark/messages-do-not-classify-as-RunnerError"
+]
+
+
 (* ---------- Missing Model -> badmode error ---------- *)
 
 VerificationTest[
