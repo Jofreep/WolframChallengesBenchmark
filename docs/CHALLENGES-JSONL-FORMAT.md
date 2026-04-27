@@ -131,3 +131,142 @@ is enforced by the `Loader/jsonl-roundtrip-matches-legacy` test in
 - Append-only friendly (add a new challenge by appending one line).
 - Standard format used by HumanEval, MBPP, APPS, BigCodeBench,
   LiveCodeBench, and most HF Datasets exports.
+
+---
+
+## Tutorial: adding a new challenge
+
+End-to-end walkthrough for adding a `ReverseList` challenge.  Two
+authoring paths are supported \[LongDash] pick whichever fits your
+workflow.
+
+### Path A: append a JSONL line (fastest)
+
+For a one-off addition, just append a record to `challenges.jsonl`:
+
+```bash
+cat >> challenges.jsonl <<'EOF'
+{"task_id":"ReverseList","name":"ReverseList","index":167,"instruction":"Write Wolfram Language code that performs the following task","prompt":"Reverse a list\nDefine the function reverseList[lst] that returns the elements of lst in reverse order.\nreverseList[{1,2,3}] -> {3,2,1}\nENTER YOUR CODE HERE\nreverseList[lst_List]:=","entry_point":"reverseList","tests":[{"input_wl":"reverseList[{1, 2, 3}]","expected_wl":"{3, 2, 1}","metadata":{}},{"input_wl":"reverseList[{}]","expected_wl":"{}","metadata":{"note":"empty-list edge case"}},{"input_wl":"reverseList[{42}]","expected_wl":"{42}","metadata":{}}]}
+EOF
+```
+
+Validate the new line parses:
+
+```bash
+wolframscript -c '
+  PacletDirectoryLoad["WolframChallengesLLMBenchmarkPaclet"];
+  Needs["JofreEspigulePons`WolframChallengesBenchmark`"];
+  data = LoadChallengesJSONL["challenges.jsonl"];
+  Print["loaded ", Length[data["challenges"]], " challenges"];
+  Print["new entry: ", data["challenges", "ReverseList"]];
+  Print["new tests: ", data["testBank", "ReverseList"]]
+'
+```
+
+### Path B: edit a `.wlchallenge` file (better for non-trivial changes)
+
+For multiple edits or a structured authoring loop, work in a `.wlchallenge`
+directory.  Seed it from the current bank if you don't have one yet:
+
+```bash
+wolframscript -c '
+  PacletDirectoryLoad["WolframChallengesLLMBenchmarkPaclet"];
+  Needs["JofreEspigulePons`WolframChallengesBenchmark`"];
+  data = LoadChallengesJSONL["challenges.jsonl"];
+  WriteWLChallengeDir[data["challenges"], data["testBank"], ".challenges"]
+'
+```
+
+Then create `.challenges/reverselist.wlchallenge`:
+
+```
+(* :Name: ReverseList  *)
+(* :Index: 167 *)
+(* :Instruction: Write Wolfram Language code that performs the following task *)
+
+(* :Prompt: *)
+Reverse a list
+Define the function reverseList[lst] that returns the elements of lst in reverse order.
+reverseList[{1,2,3}] -> {3,2,1}
+ENTER YOUR CODE HERE
+reverseList[lst_List]:=
+
+(* :Tests: *)
+{reverseList[{1, 2, 3}], {3, 2, 1}}
+{reverseList[{}], {}, <|"note" -> "empty-list edge case"|>}
+{reverseList[{42}], {42}}
+```
+
+Then re-build `challenges.jsonl`:
+
+```bash
+wolframscript -file scripts/BuildChallengesJSONL.wls --in .challenges
+```
+
+The script reads every `.wlchallenge` file in `--in`, sorts by `:Index:`,
+and writes `challenges.jsonl` (default path).  Re-run any time you edit
+the authoring directory.
+
+### Add the canonical solution (private)
+
+The reference implementation lives in `private/canonical_solutions.jsonl`,
+gitignored.  Append a record matching the new `task_id`:
+
+```bash
+cat >> private/canonical_solutions.jsonl <<'EOF'
+{"task_id":"ReverseList","canonical_solution":"reverseList[lst_List] := Reverse[lst]"}
+EOF
+```
+
+### Smoke-test against one model
+
+Run the canonical solution against its own tests (this is the bank
+self-test) by treating it as a one-off "model":
+
+```bash
+mkdir -p /tmp/canonical-smoke && \
+  echo 'reverseList[lst_List] := Reverse[lst]' \
+    > /tmp/canonical-smoke/ReverseList.wl && \
+wolframscript -file scripts/RunBenchmark.wls \
+  --solutions /tmp/canonical-smoke \
+  --model     canonical \
+  --filter    ReverseList \
+  --isolation InProcess \
+  --out       /tmp/wclb-canonical
+```
+
+Expected: `passed: 3 / 3`.  If anything else, the test bank's `expected_wl`
+disagrees with what the canonical solution actually returns \[LongDash]
+fix the bank entry (or the canonical) before shipping.
+
+### Run a real model
+
+Once the new challenge passes its canonical, queue it against an LLM:
+
+```bash
+wolframscript -file scripts/GenerateSolutions.wls \
+  --filter ReverseList \
+  --model  google/gemini-2.5-flash \
+  --out    solutions
+```
+
+Then grade the result:
+
+```bash
+wolframscript -file scripts/RunBenchmark.wls \
+  --solutions solutions/google_gemini-2.5-flash \
+  --model     google/gemini-2.5-flash \
+  --filter    ReverseList \
+  --out       runs
+```
+
+The per-run `report.html` and `report.json` show the new test alongside
+the rest of the bank.
+
+### Commit
+
+```bash
+git add challenges.jsonl
+# private/canonical_solutions.jsonl is gitignored on purpose; do NOT commit it
+git commit -m "Add ReverseList challenge"
+```
