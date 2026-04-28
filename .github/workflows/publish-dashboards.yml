@@ -1,0 +1,75 @@
+name: Publish Dashboards
+
+# Builds the four LLM-evaluation dashboards (Leaderboard, ModelStrengths,
+# Trend, BankQuality) into _site/ via scripts/BuildSite.wls and deploys
+# the result to GitHub Pages.
+#
+# Runs on the same self-hosted macOS runner as the test suite, because
+# the dashboards read from the local runs/ directory (gitignored, lives
+# only on the runner host).
+#
+# Trigger paths:
+#   - push to main: auto-deploy on every code update
+#   - workflow_dispatch: manual rebuild after a new model run lands
+#
+# GitHub Pages requirement:
+#   - For PRIVATE repos: GitHub Pro / Team / Enterprise plan
+#   - For PUBLIC repos:  free
+#   See docs/PUBLISHING.md for the choice + one-time Pages setup.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Pages deploys need the right permissions to upload + activate.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Avoid concurrent deploys clobbering each other.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build site + deploy to Pages
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 25
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    env:
+      LANG:     en_US.UTF-8
+      LC_ALL:   en_US.UTF-8
+      LC_CTYPE: UTF-8
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build site
+        # --skip-bank-quality avoids re-running the slow ~3-minute
+        # bank self-test on every push.  CI's bank-self-test job
+        # already produces a fresh runs/bank-self-test/<runId>/, and
+        # BankQualityReport reads the most recent completed one.  If
+        # you want THIS workflow to also rebuild the bank quality
+        # numbers, drop the flag.
+        run: |
+          wolframscript -file scripts/BuildSite.wls --skip-bank-quality
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
