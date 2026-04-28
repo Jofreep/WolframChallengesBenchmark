@@ -1,0 +1,12 @@
+{
+  "model": "google/gemini-3.1-pro-preview",
+  "llmEvaluator": {
+    "Service": "OpenRouter",
+    "Model": "google/gemini-3.1-pro-preview",
+    "Temperature": 0.0,
+    "MaxTokens": 8192
+  },
+  "timeoutSec": 180,
+  "maxAttempts": 3,
+  "retryBaseDelay": 2.0
+}

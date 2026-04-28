@@ -1,0 +1,12 @@
+{
+  "model": "moonshotai/kimi-k2.6",
+  "llmEvaluator": {
+    "Service": "OpenRouter",
+    "Model": "moonshotai/kimi-k2.6",
+    "Temperature": 0.0,
+    "MaxTokens": 8192
+  },
+  "timeoutSec": 180,
+  "maxAttempts": 3,
+  "retryBaseDelay": 2.0
+}

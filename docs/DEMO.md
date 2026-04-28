@@ -154,7 +154,23 @@ uniquely-passed / uniquely-failed buckets, headline summary.
 
 ---
 
-## 8. Trend dashboard (optional, ~2 s)
+## 8. Leaderboard (optional, ~2 s)
+
+Walks `runs/**/run.json`, takes the latest benchmark run per model,
+and renders a podium-style leaderboard ranked by pass rate.
+
+```
+wolframscript -file scripts/Leaderboard.wls
+open runs/leaderboard/report.html
+```
+
+Demonstrates: at-a-glance ranking across all models the harness has
+graded, with gold/silver/bronze podium for the top 3 + a full ranked
+table.  Naturally populates as new model runs land.
+
+---
+
+## 9. Trend dashboard (optional, ~2 s)
 
 Walks `runs/**/run.json` (every benchmark run + bank-self-test run on
 disk), groups by model, and renders an HTML + Markdown timeline of
@@ -171,7 +187,7 @@ runs.
 
 ---
 
-## 9. Bank-quality dashboard (optional, ~5 s)
+## 10. Bank-quality dashboard (optional, ~5 s)
 
 After running the bank-self-test (`scripts/BankSelfTest.wls`),
 classify every challenge as fully_passing / empty_canonical /
@@ -189,7 +205,7 @@ first. Drives bank-curation work by producing a concrete TODO list.
 
 ---
 
-## 10. CI (optional)
+## 11. CI (optional)
 
 ```
 gh run list --workflow=tests.yml --limit 3
