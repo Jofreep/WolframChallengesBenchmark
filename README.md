@@ -71,8 +71,8 @@ The harness:
     docs/CHALLENGES-JSONL-FORMAT.md      JSONL schema reference
     docs/WLCHALLENGE-FORMAT.md           .wlchallenge authoring format spec
     docs/ci-setup.md                     GitHub Actions / self-hosted runner
-    ALTERNATIVE_TESTS.md                 design notes on test primitives
-    AUDIT.md                             pre-refactor architecture audit
+    docs/DEMO.md                         10-minute guided tour
+    docs/Tutorial.nb                     interactive tutorial (open in Mathematica)
 
 ## Quick start
 
@@ -326,8 +326,8 @@ into an `Internal\`Bag`. The driver loop keeps `parallel` tasks in
 flight; on kernel death we deduplicate by `TaskUUID` and optionally
 retry (`--retryOnKernelDeath`).
 
-See `ALTERNATIVE_TESTS.md` for the design rationale behind the
-runner and the alternative monitoring patterns that can layer on top.
+See `docs/DEMO.md` for a 10-minute guided tour of the runner from
+the CLI, and `docs/Tutorial.nb` for an interactive walk-through.
 
 ## Continuous integration
 
