@@ -22,6 +22,13 @@ concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 
+# Action pinning: third-party actions (actions/checkout, actions/upload-
+# artifact, mikepenz/action-junit-report) are pinned to MAJOR versions
+# (@v4).  This auto-pulls patch fixes / security backports, while still
+# guarding against breaking-change bumps.  If you need fully reproducible
+# workflow runs (i.e. the same SHA every time forever), replace each
+# @v4 with the action's commit SHA -- but you'll then have to manually
+# bump those SHAs when you want a newer version.
 jobs:
   paclet-tests:
     name: Paclet VerificationTest suite

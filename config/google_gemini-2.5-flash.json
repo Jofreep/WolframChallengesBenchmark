@@ -1,0 +1,12 @@
+{
+  "model": "google/gemini-2.5-flash",
+  "llmEvaluator": {
+    "Service": "OpenRouter",
+    "Model": "google/gemini-2.5-flash",
+    "Temperature": 0.0,
+    "MaxTokens": 4096
+  },
+  "timeoutSec": 120,
+  "maxAttempts": 3,
+  "retryBaseDelay": 2.0
+}

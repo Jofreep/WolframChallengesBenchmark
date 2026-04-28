@@ -1,0 +1,12 @@
+{
+  "model": "minimax/minimax-m2.7",
+  "llmEvaluator": {
+    "Service": "OpenRouter",
+    "Model": "minimax/minimax-m2.7",
+    "Temperature": 0.0,
+    "MaxTokens": 8192
+  },
+  "timeoutSec": 180,
+  "maxAttempts": 3,
+  "retryBaseDelay": 2.0
+}
