@@ -3,16 +3,24 @@
 
 (* Leaderboard dashboard.
 
-   Walks runs/**/run.json (excluding bank-self-test / trend /
-   bank-quality / compare subdirectories), takes the most recent
-   benchmark run per model, ranks them by pass rate, and emits an
-   HTML + Markdown leaderboard.
+   Reads benchmark results, takes the most recent run per model,
+   ranks them by pass rate, and emits HTML + Markdown.
+
+   Data sources, in priority order:
+     1. data/results/<modelSlug>.json  (tracked in git \[LongDash] published
+        by scripts/PublishResults.wls; contains summary + perChallenge
+        + perTest pass/fail with NO solution source code).
+        This is what the public site reads from.
+     2. runs/run-*/run.json            (local-only fallback, used
+        when data/results/ is missing or empty so devs can rebuild
+        dashboards mid-run without first publishing).
 
    HTML uses a podium-style top-3 (gold / silver / bronze) plus a
-   ranked table for the rest.  Auto-populates as new runs land.
+   ranked table for the rest.
 
    Usage:
      wolframscript -file scripts/Leaderboard.wls \
+       [--data data/results] \
        [--runs runs] \
        [--out  runs/leaderboard]
 *)
@@ -38,28 +46,19 @@ abort[code_, msg_] := (WriteString[$Output, "ERROR: ", msg, "\n"]; Exit[code]);
 
 
 (* ----------------------------------------------------------------------- *)
-(* Discover benchmark runs (not self-test, not generated dashboards)       *)
+(* Data loading                                                            *)
 (* ----------------------------------------------------------------------- *)
 
-discoverBenchmarkRuns[runsBase_String] := Module[{paths},
-  If[! DirectoryQ[runsBase], Return[{}]];
-  paths = FileNames["run.json", runsBase, Infinity];
-  Select[paths,
-    ! StringContainsQ[#, "/bank-self-test/"] &&
-    ! StringContainsQ[#, "/trend/"]          &&
-    ! StringContainsQ[#, "/leaderboard/"]    &&
-    ! StringContainsQ[#, "/bank-quality/"]   &&
-    ! StringContainsQ[#, "/compare/"]        &]
-];
-
-loadRun[runJsonPath_String] := Module[{r, sum},
-  r   = Quiet @ Check[Import[runJsonPath, "RawJSON"], $Failed];
-  If[! AssociationQ[r], Return[Missing[]]];
+(* Project a single run record (in either format) onto the flat shape
+   the renderer expects.  Both data/results/*.json runs and direct
+   runs/run-*/run.json files share keys runId / model / createdAt /
+   summary / durationSec, so the projection is identical. *)
+projectRun[r_Association] := Module[{sum},
   sum = Lookup[r, "summary", <||>];
   <|
-    "runId"      -> Lookup[r, "runId",      "?"],
-    "model"      -> Lookup[r, "model",      "?"],
-    "createdAt"  -> Lookup[r, "createdAt",  "?"],
+    "runId"      -> Lookup[r, "runId",     "?"],
+    "model"      -> Lookup[r, "model",     "?"],
+    "createdAt"  -> Lookup[r, "createdAt", "?"],
     "passRate"   -> Lookup[sum, "passRate", 0.],
     "passed"     -> Lookup[sum, "passed", 0],
     "total"      -> Lookup[sum, "total",  0],
@@ -69,9 +68,63 @@ loadRun[runJsonPath_String] := Module[{r, sum},
   |>
 ];
 
-(* For each model, keep the run with the LATEST createdAt.  That's the
-   model's current standing on the leaderboard.  (Use --filter or
-   manual edits if you want to lock in a specific run.) *)
+(* Load latest-per-model runs from data/results/*.json (the published
+   shape).  Returns {} if the directory is absent/empty so the caller
+   can fall back. *)
+loadFromPublished[dataDir_String] := Module[{paths, runs},
+  If[! DirectoryQ[dataDir], Return[{}]];
+  paths = FileNames["*.json", dataDir];
+  runs = {};
+  Scan[
+    Function[p,
+      Module[{doc, history, latest, modelName},
+        doc = Quiet @ Check[Import[p, "RawJSON"], $Failed];
+        If[AssociationQ[doc],
+          history = Lookup[doc, "runs", {}];
+          modelName = Lookup[doc, "model", "?"];
+          If[history =!= {},
+            (* The published file's runs are already createdAt-sorted,
+               but don't trust that \[LongDash] sort here too. *)
+            latest = Last @ SortBy[history, Lookup[#, "createdAt"] &];
+            (* The published per-run record may omit `model` (the model
+               is implied by the file).  Re-attach if missing. *)
+            If[Lookup[latest, "model", Null] === Null,
+              latest = Append[latest, "model" -> modelName]];
+            AppendTo[runs, projectRun[latest]];
+          ]
+        ]
+      ]
+    ],
+    paths
+  ];
+  runs
+];
+
+(* Local-dev fallback: discover runs/run-*/run.json (skip generated
+   dashboard subdirs) and project each. *)
+loadFromLocalRuns[runsBase_String] := Module[{paths, runs},
+  If[! DirectoryQ[runsBase], Return[{}]];
+  paths = FileNames["run.json", runsBase, Infinity];
+  paths = Select[paths,
+    ! StringContainsQ[#, "/bank-self-test/"] &&
+    ! StringContainsQ[#, "/trend/"]          &&
+    ! StringContainsQ[#, "/leaderboard/"]    &&
+    ! StringContainsQ[#, "/model-strengths/"] &&
+    ! StringContainsQ[#, "/bank-quality/"]   &&
+    ! StringContainsQ[#, "/compare/"]        &];
+  runs = Map[
+    Function[p,
+      Module[{doc = Quiet @ Check[Import[p, "RawJSON"], $Failed]},
+        If[AssociationQ[doc], projectRun[doc], Missing[]]
+      ]
+    ],
+    paths];
+  DeleteCases[runs, _Missing]
+];
+
+(* For each model, keep the run with the LATEST createdAt.  Used only
+   by the local-runs fallback path; published files are already
+   per-model. *)
 latestPerModel[runs_List] := Module[{groups},
   groups = GroupBy[runs, #["model"] &];
   Last[SortBy[#, #["createdAt"] &]] & /@ groups
@@ -279,19 +332,27 @@ renderMarkdown[runs_List] := Module[{ranked, lines},
 (* ----------------------------------------------------------------------- *)
 
 main[] := Module[
-  {args, runsBase, outDir, paths, allRuns, latest, html, md},
+  {args, dataDir, runsBase, outDir, latest, source, html, md},
 
   args     = parseArgs[Drop[$ScriptCommandLine, 1]];
+  dataDir  = Lookup[args, "data", FileNameJoin[{$repoRoot, "data", "results"}]];
   runsBase = Lookup[args, "runs", FileNameJoin[{$repoRoot, "runs"}]];
   outDir   = Lookup[args, "out",  FileNameJoin[{$repoRoot, "runs", "leaderboard"}]];
 
-  paths = discoverBenchmarkRuns[runsBase];
-  WriteString[$Output, "Discovered ", Length[paths],
-    " benchmark run.json files\n"];
+  (* Prefer published data/results/ \[LongDash] this is the only path that
+     works on a fresh checkout (e.g. CI / public-clone).  Fall back to
+     scanning runs/ for local-dev convenience when nothing has been
+     published yet. *)
+  latest = loadFromPublished[dataDir];
+  source = "data/results";
+  If[latest === {},
+    WriteString[$Output,
+      "No data/results/*.json found; falling back to local runs/\n"];
+    latest = Values @ latestPerModel[loadFromLocalRuns[runsBase]];
+    source = "runs";
+  ];
 
-  allRuns = DeleteCases[loadRun /@ paths, _Missing];
-  latest  = Values @ latestPerModel[allRuns];
-
+  WriteString[$Output, "Source: ", source, "\n"];
   WriteString[$Output, "Models ranked: ", Length[latest], "\n"];
   Scan[
     WriteString[$Output, "  ",

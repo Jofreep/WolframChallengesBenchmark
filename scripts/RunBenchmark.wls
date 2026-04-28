@@ -183,6 +183,28 @@ main[] := Module[
     ]
   ];
 
+  (* Best-effort: publish a stripped, safe-to-share copy of this run
+     into data/results/<modelSlug>.json so the public dashboards can
+     be rebuilt without requiring the raw runs/ tree.  Done as a
+     sub-process so a failure here can never void the actual run. *)
+  Module[{publishScript, exitCode},
+    publishScript = FileNameJoin[{$scriptDir, "PublishResults.wls"}];
+    If[FileExistsQ[publishScript],
+      WriteString[$Output, "Publishing safe results to data/results/...\n"];
+      exitCode = Quiet @ Check[
+        RunProcess[
+          {"wolframscript", "-file", publishScript,
+           "--run", run["runDir"], "--quiet"},
+          "ExitCode"],
+        $Failed];
+      If[exitCode =!= 0,
+        WriteString[$Output,
+          "WARN: PublishResults exited ", ToString[exitCode],
+          "; data/results/ not updated for this run.\n"]
+      ]
+    ]
+  ];
+
   Module[{summary, ds},
     summary = run["meta", "summary"];
     ds      = Lookup[summary, "duration", <||>];

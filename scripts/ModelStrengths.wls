@@ -5,21 +5,28 @@
 
    "Where are LLMs strong vs weak?"
 
-   Reads each model's most recent benchmark run (excluding self-test,
-   trend, bank-quality, compare, leaderboard, modelstrengths sub-
-   directories), groups results by topic tag (loaded from
-   challenges.jsonl), and emits an HTML + Markdown matrix:
+   Reads each model's most recent benchmark run, groups results by
+   topic tag (loaded from challenges.jsonl), and emits an HTML +
+   Markdown matrix:
 
        rows: tags (sorted by aggregate model pass rate, hardest first)
        cols: models (sorted by overall pass rate, best first)
        cell: pass rate for that model on that tag, color-graded
 
    Plus a per-model strengths/weaknesses snippet listing each model's
-   top-3 strongest tags and top-3 weakest tags relative to its own
-   overall pass rate.
+   top-3 strongest tags and top-3 weakest tags.
+
+   Data sources, in priority order:
+     1. data/results/<modelSlug>.json  (tracked, published by
+        scripts/PublishResults.wls).  Contains per-test pass/fail
+        with NO solution source code.  This is what the public site
+        uses.
+     2. runs/run-*/results.wxf         (local-only fallback, for
+        rebuilding the dashboard mid-run before publishing).
 
    Usage:
      wolframscript -file scripts/ModelStrengths.wls \
+       [--data    data/results] \
        [--runs    runs] \
        [--jsonl   challenges.jsonl] \
        [--out     runs/model-strengths]
@@ -175,11 +182,53 @@ parseArgs[args_List] := Module[{i = 1, n = Length[args], out = <||>, k, v},
 abort[code_, msg_] := (WriteString[$Output, "ERROR: ", msg, "\n"]; Exit[code]);
 
 (* ----------------------------------------------------------------------- *)
-(* Discover most-recent benchmark run per model                            *)
+(* Data loading                                                            *)
+(*                                                                         *)
+(* The two source formats produce the same shape downstream:               *)
+(*    model -> {<|"challengeName" -> ..., "passed" -> ...|>, ...}          *)
+(* The accumulation loop below cares about exactly those two fields per    *)
+(* test, so we normalize at load time and keep the rest of the pipeline    *)
+(* source-agnostic.                                                        *)
 (* ----------------------------------------------------------------------- *)
 
-discoverBenchmarkRuns[runsBase_String] :=
-  Select[
+(* Primary: data/results/<modelSlug>.json.  Each file's "runs" array is
+   sorted by createdAt; we take the last entry's perTest list. *)
+loadModelTestsFromPublished[dataDir_String] := Module[
+  {paths, out = <||>},
+  If[! DirectoryQ[dataDir], Return[<||>]];
+  paths = FileNames["*.json", dataDir];
+  Scan[
+    Function[p,
+      Module[{doc, model, history, latest, perTest},
+        doc = Quiet @ Check[Import[p, "RawJSON"], $Failed];
+        If[AssociationQ[doc],
+          model   = Lookup[doc, "model", "?"];
+          history = Lookup[doc, "runs", {}];
+          If[history =!= {},
+            latest = Last @ SortBy[history, Lookup[#, "createdAt"] &];
+            perTest = Lookup[latest, "perTest", {}];
+            (* Normalize field names (published uses "challenge"; the
+               accumulator wants "challengeName"). *)
+            out[model] = Map[
+              <|"challengeName" -> Lookup[#, "challenge", "?"],
+                "passed"        -> TrueQ[Lookup[#, "passed", False]]|> &,
+              perTest
+            ];
+          ]
+        ]
+      ]
+    ],
+    paths
+  ];
+  out
+];
+
+(* Fallback: scan runs/, take latest run per model that has a finished
+   results.wxf, import each.  Same field set, normalized to challengeName. *)
+loadModelTestsFromLocalRuns[runsBase_String] := Module[
+  {paths, runRecs, byModel, latest, out = <||>},
+  If[! DirectoryQ[runsBase], Return[<||>]];
+  paths = Select[
     FileNames["run.json", runsBase, Infinity],
     ! StringContainsQ[#, "/bank-self-test/"]    &&
     ! StringContainsQ[#, "/trend/"]              &&
@@ -188,6 +237,43 @@ discoverBenchmarkRuns[runsBase_String] :=
     ! StringContainsQ[#, "/model-strengths/"]    &&
     ! StringContainsQ[#, "/compare/"]            &
   ];
+  runRecs = Map[
+    Function[p,
+      Module[{r = Quiet @ Check[Import[p, "RawJSON"], $Failed]},
+        If[! AssociationQ[r], Missing[],
+          <|"runId"     -> r["runId"],
+            "model"     -> r["model"],
+            "createdAt" -> r["createdAt"],
+            "_runDir"   -> DirectoryName[p]|>
+        ]
+      ]
+    ],
+    paths];
+  runRecs = DeleteCases[runRecs, _Missing];
+  (* WXF must exist (runner writes it last). *)
+  runRecs = Select[runRecs,
+    FileExistsQ[FileNameJoin[{#["_runDir"], "results.wxf"}]] &];
+  byModel = GroupBy[runRecs, #["model"] &];
+  latest  = Last @ SortBy[#, #["createdAt"] &] & /@ byModel;
+
+  KeyValueMap[
+    Function[{model, runRec},
+      Module[{wxf, tests},
+        wxf = FileNameJoin[{runRec["_runDir"], "results.wxf"}];
+        tests = Quiet @ Check[Import[wxf, "WXF"], {}];
+        If[ListQ[tests],
+          out[model] = Map[
+            <|"challengeName" -> Lookup[#, "challengeName", "?"],
+              "passed"        -> TrueQ[Lookup[#, "passed", False]]|> &,
+            tests
+          ]
+        ]
+      ]
+    ],
+    latest
+  ];
+  out
+];
 
 (* ----------------------------------------------------------------------- *)
 (* Render                                                                  *)
@@ -415,11 +501,13 @@ renderMarkdown[
 (* ----------------------------------------------------------------------- *)
 
 main[] := Module[
-  {args, runsBase, jsonlPath, outDir, paths, runRecs, byModel, latest,
-   data, tagsByTaskId, results, byTagModel, allTags, allModels,
+  {args, dataDir, runsBase, jsonlPath, outDir, modelTests, source,
+   data, tagsByTaskId, byTagModel, allTags, allModels, latest,
    matrix, overallByModel, byModelStrengths, html, md},
 
   args      = parseArgs[Drop[$ScriptCommandLine, 1]];
+  dataDir   = Lookup[args, "data",
+    FileNameJoin[{$repoRoot, "data", "results"}]];
   runsBase  = Lookup[args, "runs",
     FileNameJoin[{$repoRoot, "runs"}]];
   jsonlPath = Lookup[args, "jsonl",
@@ -435,41 +523,24 @@ main[] := Module[
     data["challenges", #, "tags"] &,
     Keys[data["challenges"]]];
 
-  paths = discoverBenchmarkRuns[runsBase];
-  WriteString[$Output, "Discovered ", Length[paths],
-    " benchmark run.json files\n"];
-  If[paths === {},
-    abort[1, "no benchmark runs under " <> runsBase <>
-            ".  Run scripts/RunBenchmark.wls first."]];
-
-  (* Pick the latest run.json per model based on createdAt. *)
-  runRecs = Map[
-    Function[p,
-      Module[{r = Quiet @ Check[Import[p, "RawJSON"], $Failed]},
-        If[! AssociationQ[r], Missing[],
-          <|"runId"     -> r["runId"],
-            "model"     -> r["model"],
-            "createdAt" -> r["createdAt"],
-            "_path"     -> p,
-            "_runDir"   -> DirectoryName[p]|>
-        ]
-      ]
-    ],
-    paths
+  (* Prefer published data/results; fall back to local runs/+WXF. *)
+  modelTests = loadModelTestsFromPublished[dataDir];
+  source     = "data/results";
+  If[modelTests === <||>,
+    WriteString[$Output,
+      "No data/results/*.json found; falling back to local runs/\n"];
+    modelTests = loadModelTestsFromLocalRuns[runsBase];
+    source     = "runs";
   ];
-  runRecs = DeleteCases[runRecs, _Missing];
-  (* Only consider runs that actually completed: results.wxf must
-     exist (the runner writes it last, after run.json).  An
-     interrupted run leaves run.json + progress.jsonl but no .wxf. *)
-  runRecs = Select[runRecs,
-    FileExistsQ[FileNameJoin[{#["_runDir"], "results.wxf"}]] &];
-  byModel = GroupBy[runRecs, #["model"] &];
-  latest  = Last @ SortBy[#, #["createdAt"] &] & /@ byModel;
+  If[modelTests === <||>,
+    abort[1, "no benchmark data found in " <> dataDir <> " or " <> runsBase <>
+            ".  Run scripts/RunBenchmark.wls then scripts/PublishResults.wls."]];
 
+  WriteString[$Output, "Source: ", source, "\n"];
   WriteString[$Output, "Models: ",
-    StringRiffle[Sort @ Keys[latest], ", "], "\n"];
+    StringRiffle[Sort @ Keys[modelTests], ", "], "\n"];
 
-  (* Load each latest run's results.wxf, group by tag, accumulate. *)
+  (* Group results by tag/track, accumulate per model. *)
   byTagModel = <||>;   (* tag -> model -> <|"passed", "total"|> *)
   Module[{addCell},
     addCell[tag_, model_, passed_, total_] := Module[
@@ -490,37 +561,28 @@ main[] := Module[
     ];
 
     KeyValueMap[
-      Function[{model, runRec},
-        Module[{wxf, tests, taskName, taskTags, taskTracks},
-          wxf = FileNameJoin[{runRec["_runDir"], "results.wxf"}];
-          If[! FileExistsQ[wxf],
-            WriteString[$Output, "  WARN: ", model,
-              " has no results.wxf; skipping\n"];
-            Return[Null, Module]];
-          tests = Quiet @ Check[Import[wxf, "WXF"], {}];
-          If[! ListQ[tests], Return[Null, Module]];
-
-          Scan[
-            Function[t,
+      Function[{model, tests},
+        Scan[
+          Function[t,
+            Module[{taskName, taskTags, taskTracks, p},
               taskName   = t["challengeName"];
               taskTags   = Lookup[tagsByTaskId, taskName, {}];
               taskTracks = tracksForChallenge[taskName, taskTags];
-              Scan[
-                addCell[#, model,
-                  If[TrueQ[t["passed"]], 1, 0], 1] &,
-                taskTracks
-              ];
-              (* Also record under the synthetic "_overall" pseudo-track. *)
-              addCell["_overall", model,
-                If[TrueQ[t["passed"]], 1, 0], 1];
-            ],
-            tests
-          ];
+              p          = If[TrueQ[t["passed"]], 1, 0];
+              Scan[addCell[#, model, p, 1] &, taskTracks];
+              addCell["_overall", model, p, 1];
+            ]
+          ],
+          tests
         ]
       ],
-      latest
+      modelTests
     ];
   ];
+
+  (* Re-bind `latest` to the model-keyed test map so the renderer's
+     downstream logic ("models present", etc.) keeps working. *)
+  latest = modelTests;
 
   (* "tags" here is a misnomer post-rename: these are now the official
      Wolfram Challenges TRACKS (Algorithms, Geometry, Words, etc.).
