@@ -176,10 +176,10 @@ renderHTML[runs_List] := Module[{ranked, top3, rest, podium, css, table},
         (* Order in the grid: silver | gold | bronze (so #1 sits
            visually in the middle and gets the elevated treatment). *)
         If[Length[top3] >= 2,
-          AppendTo[cards, podiumCard[2, top3[[2]], "#9e9e9e", "\:1f948"]]];
-        AppendTo[cards, podiumCard[1, top3[[1]], "#d4af37", "\:1f947"]];
+          AppendTo[cards, podiumCard[2, top3[[2]], "#9e9e9e", "\|01f948"]]];
+        AppendTo[cards, podiumCard[1, top3[[1]], "#d4af37", "\|01f947"]];
         If[Length[top3] >= 3,
-          AppendTo[cards, podiumCard[3, top3[[3]], "#cd7f32", "\:1f949"]]];
+          AppendTo[cards, podiumCard[3, top3[[3]], "#cd7f32", "\|01f949"]]];
         "<div class=\"podium\">" <> StringJoin @ cards <> "</div>"
       ],
       "<div class=\"empty\">No benchmark runs yet. Run scripts/RunBenchmark.wls against any solutions/&lt;model&gt;/ to populate.</div>"
@@ -228,7 +228,7 @@ renderHTML[runs_List] := Module[{ranked, top3, rest, podium, css, table},
     "<!doctype html><html><head><meta charset=\"utf-8\">",
     "<title>Leaderboard \[LongDash] WolframChallengesBenchmark</title>",
     "<style>", css, "</style></head><body>",
-    "<h1><span class=\"crown\">\:1f3c6</span> Leaderboard</h1>",
+    "<h1><span class=\"crown\">\|01f3c6</span> Leaderboard</h1>",
     "<div class=\"meta\">",
     ToString[Length[ranked]], " models ranked \[Bullet] ",
     "Generated: ", htmlEsc[DateString["ISODateTime"]], " \[Bullet] ",
@@ -243,7 +243,7 @@ renderMarkdown[runs_List] := Module[{ranked, lines},
   ranked = ReverseSortBy[runs, {#["passRate"], #["createdAt"]} &];
 
   lines = {
-    "# \:1f3c6 Leaderboard",
+    "# \|01f3c6 Leaderboard",
     "",
     ToString[Length[ranked]] <> " models ranked \[Bullet] generated " <>
       DateString["ISODateTime"] <> ".",

@@ -109,13 +109,13 @@ renderLanding[available_Association] := Module[{cards, cssBundle},
   ";
 
   cards = {
-    {"leaderboard",     "\:1f3c6", "Leaderboard",
+    {"leaderboard",     "\|01f3c6", "Leaderboard",
      "Podium-style ranking of every model that has been benchmarked.  Pass rate, challenges fully passing, run date.  Top-3 highlighted."},
-    {"model-strengths", "\:1f9e0", "Model strengths",
+    {"model-strengths", "\|01f9e0", "Model strengths",
      "Per-track pass-rate matrix for every model.  Top-3 strongest / weakest tracks per model.  Where each LLM is great vs. where it falls over."},
-    {"trend",           "\:1f4c8", "Trend",
+    {"trend",           "\|01f4c8", "Trend",
      "Pass-rate over time per model with inline sparklines.  Useful once a model has accumulated several runs against the bank."},
-    {"bank-quality",    "\:1f50d", "Bank quality",
+    {"bank-quality",    "\|01f50d", "Bank quality",
      "Per-challenge classification: empty canonical / parse error / value drift / fully passing.  Drives the bank-curation worklist."}
   };
 
@@ -126,7 +126,7 @@ renderLanding[available_Association] := Module[{cards, cssBundle},
     "<style>", cssBundle, "</style></head><body>",
 
     "<header>",
-    "<h1><span class=\"crown\">\:1f3c6</span> WolframChallengesBenchmark</h1>",
+    "<h1><span class=\"crown\">\|01f3c6</span> WolframChallengesBenchmark</h1>",
     "<p class=\"subtitle\">A production-grade benchmark for grading ",
     "LLM-generated Wolfram Language solutions.</p>",
     "<p class=\"meta\">Generated ", htmlEsc[DateString["ISODateTime"]], "</p>",
