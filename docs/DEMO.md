@@ -154,7 +154,24 @@ uniquely-passed / uniquely-failed buckets, headline summary.
 
 ---
 
-## 8. Bank-quality dashboard (optional, ~5 s)
+## 8. Trend dashboard (optional, ~2 s)
+
+Walks `runs/**/run.json` (every benchmark run + bank-self-test run on
+disk), groups by model, and renders an HTML + Markdown timeline of
+pass-rate-over-time per model with inline SVG sparklines.
+
+```
+wolframscript -file scripts/TrendReport.wls
+open runs/trend/report.html
+```
+
+Demonstrates: how a model drifts run-over-run and how multiple models
+compare on the same bank.  Most useful once you've accumulated several
+runs.
+
+---
+
+## 9. Bank-quality dashboard (optional, ~5 s)
 
 After running the bank-self-test (`scripts/BankSelfTest.wls`),
 classify every challenge as fully_passing / empty_canonical /
@@ -172,7 +189,7 @@ first. Drives bank-curation work by producing a concrete TODO list.
 
 ---
 
-## 9. CI (optional)
+## 10. CI (optional)
 
 ```
 gh run list --workflow=tests.yml --limit 3
