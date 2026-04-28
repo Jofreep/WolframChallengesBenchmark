@@ -170,7 +170,32 @@ table.  Naturally populates as new model runs land.
 
 ---
 
-## 9. Trend dashboard (optional, ~2 s)
+## 9. Model strengths by topic tag (optional, ~3 s)
+
+Reads each model's most recent benchmark run, groups results by the
+topic tags attached to each challenge in `challenges.jsonl`, and
+renders a per-tag pass-rate matrix (rows = tags hardest-first,
+cols = models best-first) plus per-model top-3 strongest /
+weakest tags.
+
+```
+wolframscript -file scripts/ModelStrengths.wls
+open runs/model-strengths/report.html
+```
+
+Demonstrates: where each LLM is strong (e.g. "this model is great at
+algorithmic challenges but weak on geography lookups") at a glance.
+Most useful with 2+ models on the leaderboard.
+
+If you've recently edited the bank, refresh the tags first:
+
+```
+wolframscript -file scripts/AddTagsToBank.wls
+```
+
+---
+
+## 10. Trend dashboard (optional, ~2 s)
 
 Walks `runs/**/run.json` (every benchmark run + bank-self-test run on
 disk), groups by model, and renders an HTML + Markdown timeline of
@@ -187,7 +212,7 @@ runs.
 
 ---
 
-## 10. Bank-quality dashboard (optional, ~5 s)
+## 11. Bank-quality dashboard (optional, ~5 s)
 
 After running the bank-self-test (`scripts/BankSelfTest.wls`),
 classify every challenge as fully_passing / empty_canonical /
@@ -205,7 +230,7 @@ first. Drives bank-curation work by producing a concrete TODO list.
 
 ---
 
-## 11. CI (optional)
+## 12. CI (optional)
 
 ```
 gh run list --workflow=tests.yml --limit 3

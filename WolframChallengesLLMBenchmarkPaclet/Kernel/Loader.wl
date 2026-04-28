@@ -414,7 +414,12 @@ loadChallengesJSONLImpl[path_String, privatePath_] := Module[
           "index"       -> Lookup[rec, "index", 0],
           "instruction" -> Lookup[rec, "instruction", ""],
           "prompt"      -> rec["prompt"],
-          "entry_point" -> Lookup[rec, "entry_point", ""]
+          "entry_point" -> Lookup[rec, "entry_point", ""],
+          (* Topic tags from the Wolfram Challenges site.  Optional:
+             records that don't have a "tags" field get an empty list.
+             Tag-aware dashboards (ModelStrengths, BankQualityReport)
+             read from here. *)
+          "tags"        -> Lookup[rec, "tags", {}]
         |>
       ]
     ],
