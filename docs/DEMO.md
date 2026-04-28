@@ -154,7 +154,25 @@ uniquely-passed / uniquely-failed buckets, headline summary.
 
 ---
 
-## 8. CI (optional)
+## 8. Bank-quality dashboard (optional, ~5 s)
+
+After running the bank-self-test (`scripts/BankSelfTest.wls`),
+classify every challenge as fully_passing / empty_canonical /
+parse_error / value_drift / timeout_or_other and render an
+actionable HTML + Markdown worklist:
+
+```
+wolframscript -file scripts/BankQualityReport.wls
+open runs/bank-quality/report.html
+```
+
+Demonstrates: per-challenge bank-quality classification with sample
+failing tests inline, sorted with the most-actionable categories
+first. Drives bank-curation work by producing a concrete TODO list.
+
+---
+
+## 9. CI (optional)
 
 ```
 gh run list --workflow=tests.yml --limit 3
