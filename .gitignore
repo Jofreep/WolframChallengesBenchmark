@@ -52,6 +52,15 @@ scratch/
 .legacy-archive/
 
 # Private benchmark data \[LongDash] canonical solutions, held-out tests, etc.
-# Defense-in-depth: even on a private repo we keep these out of git so they
-# can't leak via screenshares, shared zips, or downstream forks.
+# Defense-in-depth: keep these out of git so they can't leak via
+# screenshares, shared zips, or downstream forks.
 private/
+
+# Model-generated solutions \[LongDash] one .wl per challenge per model.
+# These are LLM outputs and may carry the provider's terms of service /
+# IP constraints; we keep them off git so the public repo doesn't
+# redistribute them.  Local copies stay on the developer's machine and
+# are sufficient for grading; a colleague who clones the public repo
+# brings their own (via scripts/GenerateSolutions.wls).
+solutions/*/
+!solutions/.gitkeep
