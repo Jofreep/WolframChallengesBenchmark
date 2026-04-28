@@ -74,3 +74,82 @@ VerificationTest[
   $Failed,
   TestID -> "$OpenRouterAPIKey/unset-returns-failed"
 ]
+
+
+(* ---------- parseHeldWL: single-statement source ------------------- *)
+
+VerificationTest[
+  JofreEspigulePons`WolframChallengesBenchmark`Private`parseHeldWL[
+    "addTwo[a_, b_] := a + b"],
+  HoldComplete[addTwo[a_, b_] := a + b],
+  TestID -> "parseHeldWL/single-statement"
+]
+
+
+(* ---------- parseHeldWL: multi-statement source -------------------- *)
+(* Regression test for the AliquotSequence-style canonical: a helper
+   definition followed by the main definition, separated by blank
+   lines.  Pre-fix, parseHeldWL only matched a single-element
+   {HoldComplete[__]} list and returned $Failed for any 2+ statement
+   source, silently making 161 of 724 bank-self-test entries
+   (22%) ParseError.  Now those parse to a single
+   HoldComplete[CompoundExpression[def1, def2, ...]] and run
+   correctly under ReleaseHold. *)
+
+VerificationTest[
+  Module[{src, parsed},
+    src = "test[x_] := !MemberQ[Most[x], Last[x]]\n\n" <>
+          "AliquotSequence[n_] := test[{n}]";
+    parsed = JofreEspigulePons`WolframChallengesBenchmark`Private`parseHeldWL[
+      src];
+    {Head[parsed],
+     (* The wrapped body should be a CompoundExpression containing both
+        SetDelayed defs. *)
+     MatchQ[parsed,
+       HoldComplete[CompoundExpression[_SetDelayed, _SetDelayed]]]}
+  ],
+  {HoldComplete, True},
+  TestID -> "parseHeldWL/multi-statement-glues-into-CompoundExpression"
+]
+
+
+(* ---------- parseHeldWL: multi-statement actually defines all fns -- *)
+(* Make sure the glue isn't just structural: ReleaseHold of the parsed
+   output must install ALL definitions in the kernel, not just the
+   first.  Uses long unique global names + explicit cleanup so the
+   probe doesn't pollute Global` and doesn't fight with $Context
+   binding inside parseHeldWL. *)
+
+VerificationTest[
+  Module[{parsed, result},
+    Quiet @ ClearAll[parseHeldWLProbeHelperFn, parseHeldWLProbeMainFn];
+    parsed = JofreEspigulePons`WolframChallengesBenchmark`Private`parseHeldWL[
+      "parseHeldWLProbeHelperFn[x_] := x + 100\n\n" <>
+      "parseHeldWLProbeMainFn[x_]   := parseHeldWLProbeHelperFn[x] * 2"];
+    ReleaseHold[parsed];
+    result = parseHeldWLProbeMainFn[5];
+    Quiet @ ClearAll[parseHeldWLProbeHelperFn, parseHeldWLProbeMainFn];
+    result
+  ],
+  210,   (* helper[5] = 105; main[5] = 105 * 2 = 210 *)
+  TestID -> "parseHeldWL/multi-statement-installs-all-defs"
+]
+
+
+(* ---------- parseHeldWL: empty input -------------------------------- *)
+
+VerificationTest[
+  JofreEspigulePons`WolframChallengesBenchmark`Private`parseHeldWL[""],
+  HoldComplete[Null],
+  TestID -> "parseHeldWL/empty-source"
+]
+
+
+(* ---------- parseHeldWL: malformed source returns $Failed ----------- *)
+
+VerificationTest[
+  JofreEspigulePons`WolframChallengesBenchmark`Private`parseHeldWL[
+    "this is [[[ not valid wolfram"],
+  $Failed,
+  TestID -> "parseHeldWL/malformed-returns-failed"
+]

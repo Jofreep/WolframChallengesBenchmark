@@ -72,18 +72,56 @@ extractCodeImpl[_] := $Failed;
 (* parseHeldWL — parse a WL source string into a HoldComplete[...]
    expression.  Returns HoldComplete[Null] on empty input and $Failed
    on parse error.  Used by the write-time audit to inspect the shape
-   of candidate code without ever evaluating it. *)
+   of candidate code without ever evaluating it.
 
-parseHeldWL[src_String] := Module[{parsed},
-  If[StringMatchQ[StringTrim[src], ""], Return[HoldComplete[Null]]];
+   Multi-statement source (e.g. a helper definition followed by the
+   main function) is supported: ImportString[..., "HeldExpressions"]
+   returns one HoldComplete per top-level expression, and we glue
+   them into a single HoldComplete[CompoundExpression[def1, def2,
+   ...]] so downstream `ReleaseHold[heldDef]` runs all of them in
+   order.  Without this glue, only the first statement would survive
+   into the kernel and any helper-then-main canonical (like
+   AliquotSequence's `test[x_] := ...; AliquotSequence[n_] := ...`)
+   would silently drop the main definition. *)
+
+parseHeldWL[src_String] := Module[{trimmed, parsed, joinedSource},
+  trimmed = StringTrim[src];
+  If[trimmed === "", Return[HoldComplete[Null]]];
   parsed = Quiet @ Check[
-    ImportString[src, {"WL", "HeldExpressions"}],
+    ImportString[trimmed, {"WL", "HeldExpressions"}],
     $Failed
   ];
   Which[
-    parsed === $Failed || parsed === {},                 $Failed,
-    MatchQ[parsed, {HoldComplete[__]} | _HoldComplete],  First @ Flatten[{parsed}],
-    True,                                                $Failed
+    parsed === $Failed || parsed === {}, $Failed,
+    ! ListQ[parsed], $Failed,
+    ! AllTrue[parsed, MatchQ[#, _HoldComplete] &], $Failed,
+    (* Single top-level statement: return as-is. *)
+    Length[parsed] === 1, First[parsed],
+    (* Multi-statement: re-emit each held expression's body as an
+       InputForm string (stripping the HoldComplete[...] wrapper),
+       glue with ";", and re-parse via ToExpression with HoldComplete
+       wrapper. The result is a single HoldComplete[CompoundExpression[
+       def1, def2, ...]] which ReleaseHold runs in order. *)
+    True,
+      joinedSource = StringRiffle[
+        Map[
+          Function[heldExpr,
+            Module[{s = ToString[heldExpr, InputForm,
+                                 PageWidth -> Infinity]},
+              s = StringReplace[s,
+                    StartOfString ~~ "HoldComplete[" -> ""];
+              s = StringReplace[s, "]" ~~ EndOfString -> ""];
+              s
+            ]
+          ],
+          parsed
+        ],
+        "; "
+      ];
+      Quiet @ Check[
+        ToExpression[joinedSource, InputForm, HoldComplete],
+        $Failed
+      ]
   ]
 ];
 

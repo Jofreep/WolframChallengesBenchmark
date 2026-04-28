@@ -129,12 +129,14 @@ jobs:
       - name: Run bank self-test
         if: steps.stage.outputs.skip != 'true'
         # --fail-under gates CI on the DELTA from the current baseline,
-        # not the absolute pass count.  Current baseline is ~0.39 (60 of
-        # 166 challenges have empty canonicals + a long tail of parse
-        # errors and value drift); 0.35 leaves ~4% headroom.  Bank
-        # curation to lift the absolute number is tracked separately.
+        # not the absolute pass count.  Baseline jumped from 0.39 to
+        # 0.57 after the parseHeldWL multi-statement fix; 0.50 leaves
+        # ~7% headroom against transient flakes while still catching
+        # any regression.  Bank curation to lift the absolute number
+        # further (60/166 challenges still have empty canonicals,
+        # plus residual value drift) is tracked separately.
         run: |
-          wolframscript -file scripts/BankSelfTest.wls --fail-under 0.35
+          wolframscript -file scripts/BankSelfTest.wls --fail-under 0.50
 
       - name: Upload self-test report
         if: always() && steps.stage.outputs.skip != 'true'
