@@ -1,16 +1,20 @@
 name: Publish Dashboards
 
-# Builds the four LLM-evaluation dashboards (Leaderboard, ModelStrengths,
-# Trend, BankQuality) into _site/ via scripts/BuildSite.wls and deploys
-# the result to GitHub Pages.
+# Builds the LLM-evaluation dashboards (Leaderboard, ModelStrengths,
+# Trend) into _site/ via scripts/BuildSite.wls and deploys the result
+# to GitHub Pages.
 #
-# Runs on the same self-hosted macOS runner as the test suite, because
-# the dashboards read from the local runs/ directory (gitignored, lives
-# only on the runner host).
+# The dashboards read from data/results/<modelSlug>.json which is
+# tracked in git, so this workflow no longer depends on local runs/
+# data on the runner host.  scripts/PublishResults.wls (auto-invoked
+# by RunBenchmark) is what keeps data/results/ in sync.
+#
+# (BankQualityReport is intentionally NOT bundled into the public
+# site for now.  It still works locally; just isn't linked.)
 #
 # Trigger paths:
 #   - push to main: auto-deploy on every code update
-#   - workflow_dispatch: manual rebuild after a new model run lands
+#   - workflow_dispatch: manual rebuild after a new data/results push
 #
 # GitHub Pages requirement:
 #   - For PRIVATE repos: GitHub Pro / Team / Enterprise plan
@@ -56,14 +60,8 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build site
-        # --skip-bank-quality avoids re-running the slow ~3-minute
-        # bank self-test on every push.  CI's bank-self-test job
-        # already produces a fresh runs/bank-self-test/<runId>/, and
-        # BankQualityReport reads the most recent completed one.  If
-        # you want THIS workflow to also rebuild the bank quality
-        # numbers, drop the flag.
         run: |
-          wolframscript -file scripts/BuildSite.wls --skip-bank-quality
+          wolframscript -file scripts/BuildSite.wls
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3

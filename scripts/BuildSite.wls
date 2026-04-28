@@ -1,25 +1,30 @@
 #!/usr/bin/env wolframscript
 (* ::Package:: *)
 
-(* Build a publishable static site bundling all four dashboards.
+(* Build a publishable static site bundling the LLM-benchmark
+   dashboards (Leaderboard, ModelStrengths, Trend).
 
-   Runs Leaderboard, ModelStrengths, TrendReport, and BankQualityReport
-   so each writes its HTML + Markdown into runs/<name>/ as usual,
-   then copies the HTML outputs into _site/<name>/index.html and
-   writes a styled top-level _site/index.html that links each.
+   Runs each dashboard so it writes its HTML + Markdown into
+   runs/<name>/ as usual, then copies the HTML outputs into
+   _site/<name>/index.html and writes a styled top-level
+   _site/index.html that links each.
 
-   Also copies key markdown documentation into _site/docs/ so the
-   landing page can link to README, JSONL format spec, demo guide,
-   etc., and they render nicely on Pages.
+   The bank-quality dashboard is intentionally NOT bundled into the
+   public site for now.  BankQualityReport.wls still works locally
+   if you want to inspect bank-self-test results, it just isn't
+   linked from the published landing page.  To re-enable, add a
+   "bank-quality" entry back to the cards list below and add a
+   publishHtml call for it in main.
 
    Usage:
-     wolframscript -file scripts/BuildSite.wls \
-       [--out _site] \
-       [--skip-bank-quality]   # bank-self-test must already exist; \
-                               # skip to publish without re-running it
+     wolframscript -file scripts/BuildSite.wls [--out _site]
 
-   The site is deterministic given the same runs/ contents.  Re-build
-   any time a new model run lands.
+   --skip-bank-quality is accepted but a no-op for backwards
+   compatibility with .github/workflows/publish-dashboards.yml.
+
+   The site is deterministic given the same data/results/ contents.
+   Re-build any time a new model run lands and PublishResults has
+   updated data/results/.
 *)
 
 $scriptDir = DirectoryName[$InputFileName];
@@ -114,9 +119,7 @@ renderLanding[available_Association] := Module[{cards, cssBundle},
     {"model-strengths", "\|01f9e0", "Model strengths",
      "Per-track pass-rate matrix for every model.  Top-3 strongest / weakest tracks per model.  Where each LLM is great vs. where it falls over."},
     {"trend",           "\|01f4c8", "Trend",
-     "Pass-rate over time per model with inline sparklines.  Useful once a model has accumulated several runs against the bank."},
-    {"bank-quality",    "\|01f50d", "Bank quality",
-     "Per-challenge classification: empty canonical / parse error / value drift / fully passing.  Drives the bank-curation worklist."}
+     "Pass-rate over time per model with inline sparklines.  Useful once a model has accumulated several runs against the bank."}
   };
 
   StringJoin[
@@ -169,12 +172,16 @@ renderLanding[available_Association] := Module[{cards, cssBundle},
 (* ----------------------------------------------------------------------- *)
 
 main[] := Module[
-  {args, outDir, skipBankQuality, available = <||>, indexHtml,
-   srcLeaderboard, srcStrengths, srcTrend, srcBankQuality},
+  {args, outDir, available = <||>, indexHtml,
+   srcLeaderboard, srcStrengths, srcTrend},
 
-  args            = parseArgs[Drop[$ScriptCommandLine, 1]];
-  outDir          = Lookup[args, "out", FileNameJoin[{$repoRoot, "_site"}]];
-  skipBankQuality = KeyExistsQ[args, "skip-bank-quality"];
+  args   = parseArgs[Drop[$ScriptCommandLine, 1]];
+  outDir = Lookup[args, "out", FileNameJoin[{$repoRoot, "_site"}]];
+
+  (* --skip-bank-quality is a no-op now (bank-quality is no longer
+     bundled into the public site), kept solely so the existing
+     workflow YAML doesn't error.  Silently absorb it. *)
+  Quiet @ Lookup[args, "skip-bank-quality", None];
 
   WriteString[$Output, "Building site at ", outDir, "\n\n"];
 
@@ -192,12 +199,6 @@ main[] := Module[
   WriteString[$Output, "  TrendReport ...\n"];
   runScript[FileNameJoin[{$scriptDir, "TrendReport.wls"}]];
 
-  If[! skipBankQuality,
-    WriteString[$Output, "  BankQualityReport ...\n"];
-    runScript[FileNameJoin[{$scriptDir, "BankQualityReport.wls"}]],
-    WriteString[$Output, "  BankQualityReport [skipped]\n"];
-  ];
-
   (* Wipe and re-create the site dir so stale subdirs from previous
      builds don't leak through. *)
   If[DirectoryQ[outDir],
@@ -206,10 +207,9 @@ main[] := Module[
 
   WriteString[$Output, "\nPublishing into ", outDir, ":\n"];
 
-  srcLeaderboard = FileNameJoin[{$repoRoot, "runs", "leaderboard",      "report.html"}];
-  srcStrengths   = FileNameJoin[{$repoRoot, "runs", "model-strengths",  "report.html"}];
-  srcTrend       = FileNameJoin[{$repoRoot, "runs", "trend",            "report.html"}];
-  srcBankQuality = FileNameJoin[{$repoRoot, "runs", "bank-quality",     "report.html"}];
+  srcLeaderboard = FileNameJoin[{$repoRoot, "runs", "leaderboard",     "report.html"}];
+  srcStrengths   = FileNameJoin[{$repoRoot, "runs", "model-strengths", "report.html"}];
+  srcTrend       = FileNameJoin[{$repoRoot, "runs", "trend",           "report.html"}];
 
   available["leaderboard"]     = publishHtml[srcLeaderboard,
                                   FileNameJoin[{outDir, "leaderboard"}]];
@@ -217,8 +217,6 @@ main[] := Module[
                                   FileNameJoin[{outDir, "model-strengths"}]];
   available["trend"]           = publishHtml[srcTrend,
                                   FileNameJoin[{outDir, "trend"}]];
-  available["bank-quality"]    = publishHtml[srcBankQuality,
-                                  FileNameJoin[{outDir, "bank-quality"}]];
 
   (* Landing page. *)
   indexHtml = renderLanding[available];
