@@ -30,6 +30,36 @@ Begin["JofreEspigulePons`WolframChallengesBenchmark`Private`"];
 
 $generatorVersion = "GenerateSolutions/v2-openrouter";
 
+
+(* ------------------------------------------------------------------ *)
+(* Raw response storage                                                *)
+(*                                                                    *)
+(* All raw LLM responses (successful, audit-rejected, and outright    *)
+(* failed) are written into a "raw/" subdirectory of the per-model    *)
+(* solutions dir, e.g.:                                                *)
+(*                                                                    *)
+(*     solutions/<model>/                                             *)
+(*       AliquotSequence.wl              (extracted code)             *)
+(*       AliquotSequence.meta.json       (enriched metadata)          *)
+(*       raw/                                                         *)
+(*         AliquotSequence.raw.txt       (full LLM reply)             *)
+(*         GrayCode.audit-rejected.raw.txt                            *)
+(*         CellularAutomatonTransients.failed.raw.txt                 *)
+(*                                                                    *)
+(* This keeps the top-level listing scannable (one .wl + .meta.json   *)
+(* per challenge) while preserving the un-extracted reply for         *)
+(* reproducibility audits, prompt regression analysis, and forensic   *)
+(* triage of failures.  The raw/ tree is gitignored along with the    *)
+(* rest of solutions/<model>/.                                         *)
+(* ------------------------------------------------------------------ *)
+
+rawSubdir[saveDir_String] := Module[{p = FileNameJoin[{saveDir, "raw"}]},
+  If[! DirectoryQ[p],
+    Quiet @ CreateDirectory[p, CreateIntermediateDirectories -> True]];
+  p
+];
+rawSubdir[___] := $Failed;
+
 (* Prompt is authored in a single place and carries a {{CHALLENGE}}
    substitution marker. Overridable via the "PromptTemplate" option.   *)
 
@@ -369,11 +399,15 @@ Module[{
           None],
         None];
       If[StringQ[rawBody] && DirectoryQ[saveDir],
-        failedRawPath = FileNameJoin[{saveDir,
-          safeSlug[name] <> ".failed.raw.txt"}];
-        Quiet @ Export[failedRawPath, rawBody, "Text",
-          CharacterEncoding -> "UTF-8"];
-        outcomeRec = Append[outcomeRec, "rawResponsePath" -> failedRawPath]
+        Module[{rawDir = rawSubdir[saveDir]},
+          If[StringQ[rawDir],
+            failedRawPath = FileNameJoin[{rawDir,
+              safeSlug[name] <> ".failed.raw.txt"}];
+            Quiet @ Export[failedRawPath, rawBody, "Text",
+              CharacterEncoding -> "UTF-8"];
+            outcomeRec = Append[outcomeRec, "rawResponsePath" -> failedRawPath]
+          ]
+        ]
       ]
     ];
     If[logPath =!= None,
@@ -447,10 +481,14 @@ Module[{
          ValidParentheses output was 40 KB of recursively nested
          StringMatchQ).  The JSONL keeps a 1 KB preview + the path. *)
       dumpPath = If[DirectoryQ[saveDir],
-        Module[{p = FileNameJoin[{saveDir,
-                  safeSlug[name] <> ".audit-rejected.raw.txt"}]},
-          Quiet @ Export[p, extracted, "Text", CharacterEncoding -> "UTF-8"];
-          p
+        Module[{rawDir = rawSubdir[saveDir], p},
+          If[StringQ[rawDir],
+            p = FileNameJoin[{rawDir,
+                  safeSlug[name] <> ".audit-rejected.raw.txt"}];
+            Quiet @ Export[p, extracted, "Text", CharacterEncoding -> "UTF-8"];
+            p,
+            None
+          ]
         ],
         None
       ];
@@ -487,11 +525,19 @@ Module[{
     ]
   ];
 
-  (* Optional forensic replay file for raw, un-extracted response. *)
-  If[TrueQ[Lookup[opts, "SaveRawResponse", False]],
-    Module[{rawPath},
-      rawPath = StringReplace[savePath,
-        ".wl" ~~ EndOfString -> ".raw.txt"];
+  (* Always preserve the raw, un-extracted reply alongside the .wl so
+     reproducibility audits and prompt-regression checks have the
+     original LLM output available.  Stored under the raw/ subdir to
+     keep the top-level solutions/<model>/ listing clean.
+
+     SaveRawResponse is now a no-op kept solely for backwards
+     compatibility with callers that still pass the option; raws are
+     always written for any non-dry-run challenge that produced
+     content. *)
+  Module[{rawDir = rawSubdir[saveDir], rawPath},
+    If[StringQ[rawDir] && StringQ[rawResponse] &&
+       StringLength[rawResponse] > 0,
+      rawPath = FileNameJoin[{rawDir, safeSlug[name] <> ".raw.txt"}];
       Quiet @ Export[rawPath, rawResponse, "Text",
         CharacterEncoding -> "UTF-8"]
     ]
@@ -501,6 +547,8 @@ Module[{
     "status"       -> "ok",
     "name"         -> name,
     "path"         -> savePath,
+    "rawPath"      -> FileNameJoin[{rawSubdir[saveDir],
+                                    safeSlug[name] <> ".raw.txt"}],
     "responseHash" -> responseHash,
     "promptHash"   -> promptHash,
     "attempts"     -> Length[callResult["attempts"]],

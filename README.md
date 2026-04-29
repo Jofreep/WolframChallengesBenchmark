@@ -172,9 +172,23 @@ provider:
 Every attempt is appended to a per-run JSONL audit log
 (`solutions/<model>/generate-<runId>.jsonl`) with `prompt`, `saved`,
 `failed`, `auditRejected`, and summary events. `tail -f` on this file
-during a run gives a live progress feed. Add `--save-raw` to also
-write `<name>.raw.txt` with the unextracted response next to each
-solution for forensic replay.
+during a run gives a live progress feed.
+
+The full, un-extracted LLM reply is always preserved under
+`solutions/<model>/raw/`:
+
+    solutions/<model>/
+      AliquotSequence.wl              # extracted code (audit-passed)
+      AliquotSequence.meta.json       # enriched metadata
+      raw/
+        AliquotSequence.raw.txt              # successful reply
+        GrayCode.audit-rejected.raw.txt      # extracted but failed audit
+        CellularAutomatonTransients.failed.raw.txt   # network / timeout
+
+This keeps the top-level directory scannable while preserving every
+raw response for reproducibility audits and prompt-regression
+analysis. The `--save-raw` flag is now a no-op (kept only for
+backwards compat).
 
 Other flags:
 

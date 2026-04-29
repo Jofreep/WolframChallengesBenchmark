@@ -25,9 +25,17 @@
        [--limit 10]                          \
        [--timeout 120] [--retries 3]         \
        [--retry-base-delay 2.0]              \
-       [--overwrite] [--dry-run] [--save-raw] \
+       [--overwrite] [--dry-run]              \
        [--log path/to/generate.jsonl]        \
        [--api-key-file ~/.config/openrouter/key.txt]
+
+   Raw responses:
+     The full, un-extracted LLM reply is ALWAYS saved alongside every
+     generated solution, under solutions/<model>/raw/<name>.raw.txt
+     (and `.audit-rejected.raw.txt` / `.failed.raw.txt` for the
+     respective failure modes).  This used to be opt-in via the
+     `--save-raw` flag; the flag is now a no-op kept only for
+     backwards compat with older command lines.
 
    Authentication:
      OpenRouter API key is read from the OPENROUTER_API_KEY environment
@@ -102,7 +110,8 @@ printHelp[] := WriteString[$Output,
   "  --limit N              process at most N challenges (after filter)\n",
   "  --overwrite            regenerate even if <name>.wl already exists\n",
   "  --dry-run              don't hit the LLM; emit audit-rejecting stubs\n",
-  "  --save-raw             also write <name>.raw.txt with the un-extracted reply\n",
+  "  --save-raw             [deprecated] no-op; raws are now always saved\n",
+  "                         under solutions/<model>/raw/<name>.raw.txt\n",
   "  --log PATH             override JSONL audit log location\n\n",
   "Auth:\n",
   "  OPENROUTER_API_KEY     env var (default source)\n",
@@ -192,8 +201,14 @@ main[] := Module[
                   truthy[withDefault[args, "overwrite", "true"]];
   dryRun      = KeyExistsQ[args, "dry-run"] &&
                   truthy[withDefault[args, "dry-run", "true"]];
-  saveRaw     = KeyExistsQ[args, "save-raw"] &&
-                  truthy[withDefault[args, "save-raw", "true"]];
+  (* --save-raw kept as a deprecated no-op (raws are now ALWAYS saved
+     under solutions/<model>/raw/).  Warn so anyone scripting around
+     the old flag knows it's no longer doing anything different. *)
+  saveRaw     = True;
+  If[KeyExistsQ[args, "save-raw"],
+    WriteString[$Output,
+      "[deprecated] --save-raw is now a no-op; raws are always saved ",
+      "under solutions/<model>/raw/.\n"]];
   filterArg   = Lookup[args, "filter", None];
   filter      = If[filterArg === None, All, StringSplit[filterArg, ","]];
   limit       = toInt[ withDefault[args, "limit", 0], 0];
